@@ -3,9 +3,6 @@ package it.unisannio.restaurantmanagmentservice.entity;
 import jakarta.persistence.*;
 import org.antlr.v4.runtime.misc.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Entity
 public class Restaurant {
     @Id
