@@ -45,4 +45,6 @@ public class OrderDetailService {
     public Iterable<OrderDetail> getOrderDetailsByOrderId(int id) {
         return orderDetailRepository.findByOrderId(id);
     }
+
+    public OrderDetail findByMenuItemIdAndOrderId(int menuItemId, int orderId) {return orderDetailRepository.findByMenuItemIdAndOrderId(menuItemId, orderId);}
 }
