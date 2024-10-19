@@ -41,12 +41,6 @@ public class PaymentDetailService {
     @Autowired
     private UserOrderDetailRepository userOrderDetailRepository;
 
-    @Value("${api.username}")
-    private String username;
-
-    @Value("${api.password}")
-    private String password;
-
     // L'id del pagamento si prende dalla mail ricevuta nel momento di creazione del singolo PaymentDetail
     public ResponseEntity updatePaymentDetail(int id, String method){
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
@@ -134,8 +128,26 @@ public class PaymentDetailService {
         if(restaurantAccount == null)
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
 
+        double discountedAmount = 0f;
+        try{
+            ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId());
+        } catch (Exception e){}
+        if(discountedAmount == 0f){
+            try{
+                ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+            } finally {
+                creditCard.charge(detail.getAmount());
+            }
+        }
+        else{
+            try{
+                ScoreService.userSetScore(discountedAmount, detail.getUserId());
+                creditCard.charge(discountedAmount);
+            } catch (Exception e){
+                creditCard.charge(detail.getAmount());
+            }
+        }
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
-        creditCard.charge(detail.getAmount());
         bankAccountRepository.save(restaurantAccount);
         creditCardRepository.save(creditCard);
         return checkStatusAndSendEmail(detail);
@@ -158,8 +170,26 @@ public class PaymentDetailService {
         if(restaurantAccount == null)
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
 
+        double discountedAmount = 0f;
+        try{
+            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId());
+        } catch (Exception e){}
+        if(discountedAmount == 0f){
+            try{
+                ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+            } finally {
+                account.charge(detail.getAmount());
+            }
+        }
+        else{
+            try{
+                ScoreService.userSetScore(discountedAmount, detail.getUserId());
+                account.charge(discountedAmount);
+            } catch (Exception e){
+                account.charge(detail.getAmount());
+            }
+        }
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
-        account.charge(detail.getAmount());
         bankAccountRepository.save(restaurantAccount);
         paypalAccountRepository.save(account);
         return checkStatusAndSendEmail(detail);
@@ -177,6 +207,9 @@ public class PaymentDetailService {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
 
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
+        try{
+            ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+        } catch (Exception e){}
         bankAccountRepository.save(restaurantAccount);
         return checkStatusAndSendEmail(detail);
     }
@@ -276,15 +309,11 @@ public class PaymentDetailService {
     private ResponseEntity sendProcessedPaymentEmail(PaymentDetail detail){
         Client client = ClientBuilder.newClient();
 
-        String auth = username + ":" + password;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         WebTarget resource = client.target("http://localhost:8087/customer/" + detail.getUserId());
         Customer customer;
         try {
             Response response = resource.request()
                     .accept(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Basic " + encodedAuth)
                     .get();
 
             if (response.getStatus() == 200) {

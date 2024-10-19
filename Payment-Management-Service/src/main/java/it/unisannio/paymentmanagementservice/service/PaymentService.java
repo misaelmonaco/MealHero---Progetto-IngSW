@@ -35,12 +35,6 @@ public class PaymentService {
     @Autowired
     private PaymentDetailRepository paymentDetailRepository;
 
-    @Value("${api.username}")
-    private String username;
-
-    @Value("${api.password}")
-    private String password;
-
     public ResponseEntity addPayment(Payment payment, List<Integer> userIds) {
 
         ResponseEntity response = ResponseEntity.internalServerError().body("Non è stato possibile effettuare il pagamento!");;
@@ -151,15 +145,11 @@ public class PaymentService {
     private ResponseEntity sendPaymentEmail(Integer userId, PaymentDetail detail) {
         Client client = ClientBuilder.newClient();
 
-        String auth = username + ":" + password;
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         WebTarget resource = client.target("http://localhost:8087/customer/" + userId);
         Customer customer;
         try {
             Response response = resource.request()
                     .accept(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Basic " + encodedAuth)
                     .get();
 
             if (response.getStatus() == 200) {
