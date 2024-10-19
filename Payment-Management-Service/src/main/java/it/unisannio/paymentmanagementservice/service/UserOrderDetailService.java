@@ -1,6 +1,6 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import it.unisannio.paymentmanagementservice.entity.UserOrderDetail;
+import it.unisannio.paymentmanagementservice.model.entity.UserOrderDetail;
 import it.unisannio.paymentmanagementservice.repository.UserOrderDetailRepository;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;

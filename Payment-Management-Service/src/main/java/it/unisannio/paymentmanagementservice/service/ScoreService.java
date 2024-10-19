@@ -1,7 +1,7 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import it.unisannio.paymentmanagementservice.entity.BankAccount;
-import it.unisannio.paymentmanagementservice.entity.Customer;
+import it.unisannio.paymentmanagementservice.model.entity.BankAccount;
+import it.unisannio.paymentmanagementservice.model.Customer;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;

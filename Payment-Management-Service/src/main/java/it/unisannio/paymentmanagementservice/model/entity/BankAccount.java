@@ -1,4 +1,4 @@
-package it.unisannio.paymentmanagementservice.entity;
+package it.unisannio.paymentmanagementservice.model.entity;
 
 import jakarta.persistence.*;
 

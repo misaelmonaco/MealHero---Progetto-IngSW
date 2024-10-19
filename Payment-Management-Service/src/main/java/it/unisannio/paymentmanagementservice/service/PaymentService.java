@@ -1,8 +1,8 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import it.unisannio.paymentmanagementservice.entity.Customer;
-import it.unisannio.paymentmanagementservice.entity.Payment;
-import it.unisannio.paymentmanagementservice.entity.PaymentDetail;
+import it.unisannio.paymentmanagementservice.model.Customer;
+import it.unisannio.paymentmanagementservice.model.entity.Payment;
+import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
 import it.unisannio.paymentmanagementservice.repository.PaymentRepository;
 import jakarta.transaction.Transactional;
@@ -13,18 +13,15 @@ import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 
-import static it.unisannio.paymentmanagementservice.entity.PaymentType.*;
+import static it.unisannio.paymentmanagementservice.model.PaymentType.*;
 
 @Service
 public class PaymentService {

@@ -1,8 +1,6 @@
 package it.unisannio.paymentmanagementservice.controller;
 
-import it.unisannio.paymentmanagementservice.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.service.PaymentDetailService;
-import jakarta.websocket.server.PathParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

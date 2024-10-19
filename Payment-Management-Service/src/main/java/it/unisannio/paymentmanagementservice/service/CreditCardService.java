@@ -1,6 +1,6 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import it.unisannio.paymentmanagementservice.entity.CreditCard;
+import it.unisannio.paymentmanagementservice.model.entity.CreditCard;
 import it.unisannio.paymentmanagementservice.repository.CreditCardRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

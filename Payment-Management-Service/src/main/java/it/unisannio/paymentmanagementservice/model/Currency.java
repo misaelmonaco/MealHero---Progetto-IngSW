@@ -1,4 +1,4 @@
-package it.unisannio.paymentmanagementservice.entity;
+package it.unisannio.paymentmanagementservice.model;
 
 public enum Currency {
     USD, // Dollaro Statunitense

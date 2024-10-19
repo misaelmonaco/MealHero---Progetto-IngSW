@@ -1,6 +1,6 @@
 package it.unisannio.paymentmanagementservice.repository;
 
-import it.unisannio.paymentmanagementservice.entity.CreditCard;
+import it.unisannio.paymentmanagementservice.model.entity.CreditCard;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;

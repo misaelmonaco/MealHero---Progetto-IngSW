@@ -1,6 +1,6 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import it.unisannio.paymentmanagementservice.entity.PayPalAccount;
+import it.unisannio.paymentmanagementservice.model.entity.PayPalAccount;
 import it.unisannio.paymentmanagementservice.repository.PayPalAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
