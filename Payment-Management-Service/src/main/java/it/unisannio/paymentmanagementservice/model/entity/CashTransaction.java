@@ -1,6 +1,7 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
 import it.unisannio.paymentmanagementservice.model.PaymentMethod;
+import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.Entity;
 
 @Entity
@@ -8,11 +9,11 @@ public class CashTransaction extends Transaction {
 
     private int employeeId;
 
-    protected CashTransaction() {}
+    protected CashTransaction() {super.setPaymentMethod("CASH");}
 
-    public CashTransaction(double amount, String currency, int userId, int restaurantId, String paymentType, int employeeId) {
+    public CashTransaction(double amount, String currency, int userId, int restaurantId, PaymentType paymentType, int employeeId) {
         super(amount, currency, userId, restaurantId, paymentType);
-        super.setPaymentMethod(PaymentMethod.CASH);
+        super.setPaymentMethod("CASH");
         this.employeeId = employeeId;
     }
 

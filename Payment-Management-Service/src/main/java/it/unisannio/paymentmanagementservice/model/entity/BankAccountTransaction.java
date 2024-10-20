@@ -25,7 +25,7 @@ public class BankAccountTransaction {
 
     private Currency currency;
 
-    protected BankAccountTransaction() {}
+    protected BankAccountTransaction() { this.transactionDate = LocalDateTime.now();}
 
     public BankAccountTransaction(int bankAccountSenderId, int bankAccountReceiverId, double amount, String currency) {
         this.bankAccountSenderId = bankAccountSenderId;

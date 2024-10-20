@@ -28,16 +28,17 @@ public class Transaction {
 
     private PaymentMethod paymentMethod;
 
+    @Enumerated(EnumType.STRING)
     private PaymentType paymentType;
 
-    protected Transaction() {}
+    protected Transaction() {this.transactionDateTime = LocalDateTime.now();}
 
-    public Transaction(double amount, String currency, int userId, int restaurantId, String paymentType) {
+    public Transaction(double amount, String currency, int userId, int restaurantId, PaymentType paymentType) {
         this.amount = amount;
         this.currency = Currency.valueOf(currency);
         this.userId = userId;
         this.restaurantId = restaurantId;
-        this.paymentType = PaymentType.valueOf(paymentType);
+        this.paymentType = paymentType;
         this.transactionDateTime = LocalDateTime.now();
     }
 
@@ -81,16 +82,16 @@ public class Transaction {
         return paymentMethod;
     }
 
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
-        this.paymentMethod = paymentMethod;
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = PaymentMethod.valueOf(paymentMethod);
     }
 
     public PaymentType getPaymentType() {
         return paymentType;
     }
 
-    public void setPaymentType(PaymentType paymentType) {
-        this.paymentType = paymentType;
+    public void setPaymentType(String paymentType) {
+        this.paymentType = PaymentType.valueOf(paymentType);
     }
 
     public LocalDateTime getTransactionDateTime() {

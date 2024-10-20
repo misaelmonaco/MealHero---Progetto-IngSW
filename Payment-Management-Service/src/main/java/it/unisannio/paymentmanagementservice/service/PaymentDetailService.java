@@ -5,7 +5,6 @@ import it.unisannio.paymentmanagementservice.model.entity.*;
 import it.unisannio.paymentmanagementservice.model.PaymentMethod;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import it.unisannio.paymentmanagementservice.repository.*;
-import jakarta.persistence.Column;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -161,9 +160,9 @@ public class PaymentDetailService {
         CardTransaction transaction;
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
         if(discountedAmount == 0f) {
-            transaction = new CardTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), creditCard.getCardNumber());
+            transaction = new CardTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), creditCard.getCardNumber());
         } else {
-            transaction = new CardTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), creditCard.getCardNumber());
+            transaction = new CardTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), creditCard.getCardNumber());
         }
         bankAccountRepository.save(restaurantAccount);
         creditCardRepository.save(creditCard);
@@ -210,9 +209,9 @@ public class PaymentDetailService {
         PayPalTransaction transaction;
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
         if(discountedAmount == 0f) {
-            transaction = new PayPalTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), account.getId());
+            transaction = new PayPalTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), account.getId());
         } else {
-            transaction = new PayPalTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), account.getId());
+            transaction = new PayPalTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), account.getId());
         }
         bankAccountRepository.save(restaurantAccount);
         paypalAccountRepository.save(account);
@@ -246,7 +245,7 @@ public class PaymentDetailService {
         try{
             ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
         } catch (Exception e){}
-        CashTransaction transaction = new CashTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), employee.getRestaurantId(), payment.getPaymentType().toString(), employee.getId());
+        CashTransaction transaction = new CashTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), employee.getRestaurantId(), payment.getPaymentType(), employee.getId());
         bankAccountRepository.save(restaurantAccount);
         cashTransactionRepository.save(transaction);
         client.close();

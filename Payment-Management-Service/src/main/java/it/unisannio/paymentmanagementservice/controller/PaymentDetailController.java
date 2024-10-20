@@ -21,7 +21,10 @@ public class PaymentDetailController {
 
     @PutMapping("/pay/{paymentDetailId}")
     public ResponseEntity pay(@PathVariable Integer paymentDetailId, @RequestParam(value = "employee", required = false) Integer employeeId) throws Exception {
-        return paymentDetailService.pay(paymentDetailId, employeeId);
+        if(employeeId != null) {
+            return paymentDetailService.pay(paymentDetailId, employeeId);
+        }
+        return paymentDetailService.pay(paymentDetailId, 0);
     }
 
     @GetMapping("/{id}")

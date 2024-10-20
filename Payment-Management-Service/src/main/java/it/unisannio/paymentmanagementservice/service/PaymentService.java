@@ -1,6 +1,8 @@
 package it.unisannio.paymentmanagementservice.service;
 
 import it.unisannio.paymentmanagementservice.model.Customer;
+import it.unisannio.paymentmanagementservice.model.PaymentStatus;
+import it.unisannio.paymentmanagementservice.model.PaymentType;
 import it.unisannio.paymentmanagementservice.model.entity.Payment;
 import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
@@ -34,7 +36,10 @@ public class PaymentService {
 
     public ResponseEntity addPayment(Payment payment, List<Integer> userIds) {
 
-        ResponseEntity response = ResponseEntity.internalServerError().body("Non è stato possibile effettuare il pagamento!");;
+        ResponseEntity response = ResponseEntity.internalServerError().body("Non è stato possibile effettuare il pagamento!");
+
+        if(paymentRepository.getPaymentByReservation(payment.getReservationID()) != null)
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Risulta già creato un pagamento per la prenotazione selezionata!") ;
 
         if(userIds.isEmpty())
             return ResponseEntity.internalServerError().body("Non sono stati specificati gli users che devono pagare!");
@@ -91,6 +96,8 @@ public class PaymentService {
         payment.setStatus("NOT_PAYED");
         paymentRepository.save(payment);
         PaymentDetail detail = new PaymentDetail(userIds.get(0), payment.getId(), payment.getAmount(), false);
+        detail.setStatus(PaymentStatus.NOT_PAYED);
+        detail.setType(ALL_IN_ONE);
         paymentDetailRepository.save(detail);
         ResponseEntity response = sendPaymentEmail(userIds.get(0), detail);
         if(!(response.getStatusCode().is2xxSuccessful())){
@@ -111,6 +118,8 @@ public class PaymentService {
 
         for (Integer userId : userIds) {
             PaymentDetail detail = new PaymentDetail(userId, payment.getId(), amount, false);
+            detail.setStatus(PaymentStatus.NOT_PAYED);
+            detail.setType(EQUALLY_SPLIT);
             paymentDetailRepository.save(detail);
             ResponseEntity response = sendPaymentEmail(userId, detail);
             if(!(response.getStatusCode().is2xxSuccessful())){
@@ -128,6 +137,8 @@ public class PaymentService {
 
         for (Integer userId : userIds) {
             PaymentDetail detail = new PaymentDetail(userId, payment.getId(), 0f, false);
+            detail.setStatus(PaymentStatus.NOT_PAYED);
+            detail.setType(PERSONALLY_SPLIT);
             paymentDetailRepository.save(detail);
             ResponseEntity response = sendPaymentEmail(userId, detail);
             if(!(response.getStatusCode().is2xxSuccessful())){

@@ -1,6 +1,6 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
-import it.unisannio.paymentmanagementservice.model.PaymentMethod;
+import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.Entity;
 
 @Entity
@@ -8,11 +8,11 @@ public class CardTransaction extends Transaction {
 
     private String creditCardNumber;
 
-    protected CardTransaction() {}
+    protected CardTransaction() { super(); super.setPaymentMethod("CARD");}
 
-    public CardTransaction(double amount, String currency, int userId, int restaurantId, String paymentType, String creditCardNumber) {
+    public CardTransaction(double amount, String currency, int userId, int restaurantId, PaymentType paymentType, String creditCardNumber) {
         super(amount, currency, userId, restaurantId, paymentType);
-        super.setPaymentMethod(PaymentMethod.CARD);
+        this.setPaymentMethod("CARD");
         this.creditCardNumber = creditCardNumber;
     }
 

@@ -141,23 +141,14 @@ public class TransactionService {
     }
 
     public Iterable<Transaction> getTransactionsByRestaurantId(int id){
-        if(!transactionRepository.findByRestaurantId(id).iterator().hasNext()){
-            return null;
-        }
         return transactionRepository.findByRestaurantId(id);
     }
 
     public Iterable<Transaction> getTransactionsByUserId(int id){
-        if(!transactionRepository.findByUserId(id).iterator().hasNext()){
-            return null;
-        }
         return transactionRepository.findByUserId(id);
     }
 
     public Iterable<BankAccountTransaction> getBankAccountTransactionsByRestaurantId(int id){
-        if(!bankAccountTransactionRepository.findByRestaurantId(id).iterator().hasNext()){
-            return null;
-        }
         return bankAccountTransactionRepository.findByRestaurantId(id);
     }
 }

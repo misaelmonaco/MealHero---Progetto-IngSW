@@ -35,7 +35,8 @@ public class ScoreService {
         resource = target.path("score/" + points + "/" + customer.getId());
 
         try{
-            Response response = resource.request().put(null);
+            Response response = resource.request(MediaType.APPLICATION_JSON)
+                    .put(Entity.entity(points, MediaType.APPLICATION_JSON));
         } catch (Exception e){
             System.err.println("Impossibile assegnare dei punti all'utente con id " + userId + "!\n" + e.getMessage());
         }
@@ -56,6 +57,9 @@ public class ScoreService {
             System.err.println("Impossibile recuperare l'utente con id " + userId + "!\n" + e.getMessage());
             return 0f;
         }
+
+        if(customer.getScore() == 0)
+            return 0f;
 
         // Il massimo sconto ottenibile vale il 95% della somma totale
         // (questo perchè in caso di errore viene ritornato 0.0 e non può essere confuso con unosconto del 100%)
