@@ -1,6 +1,7 @@
 package it.unisannio.paymentmanagementservice.controller;
 
 import it.unisannio.paymentmanagementservice.service.PaymentDetailService;
+import jakarta.websocket.server.PathParam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +20,8 @@ public class PaymentDetailController {
     }
 
     @PutMapping("/pay/{paymentDetailId}")
-    public ResponseEntity pay(@PathVariable Integer paymentDetailId) {
-        return paymentDetailService.pay(paymentDetailId);
+    public ResponseEntity pay(@PathVariable Integer paymentDetailId, @RequestParam(value = "employee", required = false) Integer employeeId) throws Exception {
+        return paymentDetailService.pay(paymentDetailId, employeeId);
     }
 
     @GetMapping("/{id}")

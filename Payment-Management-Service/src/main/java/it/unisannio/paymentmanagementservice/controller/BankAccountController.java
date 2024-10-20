@@ -24,7 +24,7 @@ public class BankAccountController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity updateBankAccount(@PathVariable Integer id, @RequestBody BankAccount bankAccount) {
+    public ResponseEntity updateBankAccount(@PathVariable Integer id, @RequestBody BankAccount bankAccount) throws Exception {
         return bankAccountService.updateBankAccount(id, bankAccount);
     }
 
@@ -43,7 +43,7 @@ public class BankAccountController {
     }
 
     @GetMapping("/iban/{iban}")
-    public ResponseEntity getBankAccountByIban(@PathVariable String iban) {
+    public ResponseEntity getBankAccountByIban(@PathVariable String iban) throws Exception {
         if(bankAccountService.findBankAccountByIban(iban) == null)
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok(bankAccountService.findBankAccountByIban(iban));

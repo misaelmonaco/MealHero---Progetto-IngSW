@@ -11,10 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface PaymentDetailRepository extends CrudRepository<PaymentDetail, Integer> {
 
-    @Query("SELECT pd FROM PaymentDetail pd WHERE pd.paymentId =: paymentId")
+    @Query("SELECT pd FROM PaymentDetail pd WHERE pd.paymentId =:paymentId")
     Iterable<PaymentDetail> findByPaymentId(@Param("paymentId") Integer paymentId);
 
-    @Query("SELECT pd FROM PaymentDetail pd WHERE pd.userId =: userId")
+    @Query("SELECT pd FROM PaymentDetail pd WHERE pd.userId =:userId")
     Iterable<PaymentDetail> findByUserId(@Param("userId") Integer userId);
 
     @Modifying

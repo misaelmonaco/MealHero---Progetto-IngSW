@@ -1,6 +1,10 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Base64;
+
+import it.unisannio.paymentmanagementservice.model.AESEncryption;
 import jakarta.persistence.*;
 
 @Entity
@@ -30,12 +34,12 @@ public class CreditCard {
 
     public CreditCard() {}
 
-    public CreditCard(int userId, String cardNumber, String cardHolderName, LocalDate expirationDate, String cvv, double balance) {
+    public CreditCard(int userId, String cardNumber, String cardHolderName, LocalDate expirationDate, String cvv, double balance) throws Exception {
         this.userId = userId;
-        this.cardNumber = cardNumber;
-        this.cardHolderName = cardHolderName;
+        this.cardNumber = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardNumber.getBytes()));
+        this.cardHolderName = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardHolderName.getBytes()));;
         this.expirationDate = expirationDate;
-        this.cvv = cvv;
+        this.cvv = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cvv.getBytes()));
         this.balance = balance;
     }
 
@@ -43,20 +47,20 @@ public class CreditCard {
         return id;
     }
 
-    public String getCardNumber() {
-        return cardNumber;
+    public String getCardNumber() throws Exception {
+        return new String(Base64.getDecoder().decode(AESEncryption.decrypt(cardNumber)));
     }
 
-    public void setCardNumber(String cardNumber) {
-        this.cardNumber = cardNumber;
+    public void setCardNumber(String cardNumber) throws Exception {
+        this.cardNumber = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardNumber.getBytes()));
     }
 
-    public String getCardHolderName() {
-        return cardHolderName;
+    public String getCardHolderName() throws Exception {
+        return new String(Base64.getDecoder().decode(AESEncryption.decrypt(this.cardHolderName)));
     }
 
-    public void setCardHolderName(String cardHolderName) {
-        this.cardHolderName = cardHolderName;
+    public void setCardHolderName(String cardHolderName) throws Exception {
+        this.cardHolderName = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardHolderName.getBytes()));
     }
 
     public LocalDate getExpirationDate() {
@@ -68,12 +72,12 @@ public class CreditCard {
     }
 
 
-    public String getCvv() {
-        return cvv;
+    public String getCvv() throws Exception {
+        return new String(Base64.getDecoder().decode(AESEncryption.decrypt(this.cvv)));
     }
 
-    public void setCvv(String cvv) {
-        this.cvv = cvv;
+    public void setCvv(String cvv) throws Exception {
+        this.cvv = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cvv.getBytes()));
     }
 
     public double getBalance() {
@@ -84,17 +88,17 @@ public class CreditCard {
         this.balance = balance;
     }
 
-    public boolean hasSufficientBalance(double amount) {
-        return this.balance >= amount;
+    public boolean hasSufficientBalance(double amount) throws Exception {
+        return getBalance() >= amount;
     }
 
     public int getUserId() {
         return userId;
     }
 
-    public void charge(double amount) {
+    public void charge(double amount) throws Exception {
         if (hasSufficientBalance(amount)) {
-            this.balance -= amount;
+            setBalance(this.balance - amount);
         } else {
             throw new IllegalArgumentException("Saldo insufficiente");
         }

@@ -1,11 +1,14 @@
 package it.unisannio.paymentmanagementservice.service;
 
+import it.unisannio.paymentmanagementservice.model.AESEncryption;
 import it.unisannio.paymentmanagementservice.model.entity.CreditCard;
 import it.unisannio.paymentmanagementservice.repository.CreditCardRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import java.util.Base64;
 
 @Service
 public class CreditCardService {
@@ -25,7 +28,7 @@ public class CreditCardService {
         return ResponseEntity.ok().build();
     }
 
-    public ResponseEntity updateCreditCard(int id, CreditCard creditCard) {
+    public ResponseEntity updateCreditCard(int id, CreditCard creditCard) throws Exception {
         CreditCard existingCard = creditCardRepository.findById(id).orElse(null);
         if(existingCard == null)
             return ResponseEntity.notFound().build();
@@ -50,11 +53,11 @@ public class CreditCardService {
         return creditCardRepository.findByUserId(userId).orElse(null);
     }
 
-    public CreditCard getCreditCardByCardNumber(String cardNumber) {
-        return creditCardRepository.getByCardNumber(cardNumber).orElse(null);
+    public CreditCard getCreditCardByCardNumber(String cardNumber) throws Exception {
+        return creditCardRepository.getByCardNumber(AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardNumber.getBytes()))).orElse(null);
     }
 
-    public Iterable<CreditCard> getCreditCardByHolderName(String holderName) {
-        return creditCardRepository.getByHolderName(holderName);
+    public Iterable<CreditCard> getCreditCardByHolderName(String holderName) throws Exception {
+        return creditCardRepository.getByHolderName(AESEncryption.encrypt(Base64.getEncoder().encodeToString(holderName.getBytes())));
     }
 }

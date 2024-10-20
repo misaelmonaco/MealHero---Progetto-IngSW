@@ -1,11 +1,14 @@
 package it.unisannio.paymentmanagementservice.service;
 
+import it.unisannio.paymentmanagementservice.model.AESEncryption;
 import it.unisannio.paymentmanagementservice.model.entity.PayPalAccount;
 import it.unisannio.paymentmanagementservice.repository.PayPalAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+
+import java.util.Base64;
 
 @Service
 public class PayPalAccountService {
@@ -25,7 +28,7 @@ public class PayPalAccountService {
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 
-    public ResponseEntity updatePayPalAccount(int id, PayPalAccount payPalAccount) {
+    public ResponseEntity updatePayPalAccount(int id, PayPalAccount payPalAccount) throws Exception {
         PayPalAccount existingPayPalAccount = payPalAccountRepository.findById(id).orElse(null);
         if (existingPayPalAccount == null)
             return ResponseEntity.notFound().build();
@@ -45,8 +48,8 @@ public class PayPalAccountService {
         return payPalAccountRepository.findAll();
     }
 
-    public PayPalAccount getPayPalAccountByEmail(String email) {
-        return payPalAccountRepository.findByEmail(email).orElse(null);
+    public PayPalAccount getPayPalAccountByEmail(String email) throws Exception {
+        return payPalAccountRepository.findByEmail(AESEncryption.encrypt(Base64.getEncoder().encodeToString(email.getBytes()))).orElse(null);
     }
 
     public PayPalAccount getPayPalAccountByUserId(Integer userId) {

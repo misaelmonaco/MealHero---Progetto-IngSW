@@ -23,18 +23,9 @@ public class SecurityConfig {
     public DefaultSecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(customizer -> customizer.disable())
-                .authorizeRequests(request -> request.anyRequest().authenticated())
-                .formLogin(Customizer.withDefaults()) //For the browser
-                .httpBasic(Customizer.withDefaults());  //For basic clients like Postman
+                .authorizeHttpRequests(authorize ->
+                        authorize.anyRequest().permitAll());
 
         return http.build();
-    }
-
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setPasswordEncoder(new BCryptPasswordEncoder(12));
-        authProvider.setUserDetailsService(userDetailsService);
-        return authProvider;
     }
 }

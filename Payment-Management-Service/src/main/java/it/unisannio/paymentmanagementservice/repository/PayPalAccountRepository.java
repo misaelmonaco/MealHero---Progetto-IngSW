@@ -9,9 +9,9 @@ import java.util.Optional;
 
 public interface PayPalAccountRepository extends CrudRepository<PayPalAccount, Integer> {
 
-    @Query("SELECT pa FROM PayPalAccount pa WHERE pa.userId =: userId")
+    @Query("SELECT pa FROM PayPalAccount pa WHERE pa.userId =:userId")
     Optional<PayPalAccount> findByUserId(@Param("userId") Integer userId);
 
-    @Query("SELECT pa FROM PayPalAccount pa WHERE pa.email =: email")
+    @Query("SELECT pa FROM PayPalAccount pa WHERE pa.email =:email")
     Optional<PayPalAccount> findByEmail(@Param("email") String email);
 }

@@ -9,9 +9,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PaymentRepository extends CrudRepository<Payment, Integer> {
 
-    @Query("SELECT p FROM Payment p WHERE p.restaurantPayeeId =: restaurantId")
+    @Query("SELECT p FROM Payment p WHERE p.restaurantPayeeId =:restaurantId")
     Iterable<Payment> getPaymentsByRestaurant(@Param("restaurantId") int restaurantId);
 
-    @Query("SELECT p FROM Payment p WHERE p.reservationID =: reservationId")
+    @Query("SELECT p FROM Payment p WHERE p.reservationID =:reservationId")
     Payment getPaymentByReservation(@Param("reservationId") int reservationId);
 }

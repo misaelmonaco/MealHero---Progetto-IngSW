@@ -5,6 +5,7 @@ import it.unisannio.paymentmanagementservice.model.entity.*;
 import it.unisannio.paymentmanagementservice.model.PaymentMethod;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import it.unisannio.paymentmanagementservice.repository.*;
+import jakarta.persistence.Column;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -41,6 +42,14 @@ public class PaymentDetailService {
     @Autowired
     private UserOrderDetailRepository userOrderDetailRepository;
 
+    @Autowired
+    private PayPalTransactionRepository payPalTransactionRepository;
+
+    @Autowired
+    private CardTransactionRepository cardTransactionRepository;
+    @Autowired
+    private CashTransactionRepository cashTransactionRepository;
+
     // L'id del pagamento si prende dalla mail ricevuta nel momento di creazione del singolo PaymentDetail
     public ResponseEntity updatePaymentDetail(int id, String method){
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
@@ -56,7 +65,7 @@ public class PaymentDetailService {
         return ResponseEntity.ok().body("Metodo di pagamento selezionato, ora puoi procedere con la transazione!");
     }
 
-    public ResponseEntity pay(int id){
+    public ResponseEntity pay(int id, int employeeId) throws Exception {
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
         if(detail == null)
             return ResponseEntity.notFound().build();
@@ -72,7 +81,9 @@ public class PaymentDetailService {
                 return responseEntity;
 
             case CASH:
-                responseEntity = payWithCash(detail);
+                if(employeeId == 0)
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Non è stato specificato l'id del dipendente responsabile del pagamento");
+                responseEntity = payWithCash(detail, employeeId);
                 return responseEntity;
 
             default:
@@ -111,7 +122,7 @@ public class PaymentDetailService {
     }
 
     @Transactional
-    protected ResponseEntity payWithCard(PaymentDetail detail){
+    protected ResponseEntity payWithCard(PaymentDetail detail) throws Exception {
 
         CreditCard creditCard = creditCardRepository.findByUserId(detail.getUserId()).orElse(null);
         if(creditCard == null)
@@ -130,7 +141,7 @@ public class PaymentDetailService {
 
         double discountedAmount = 0f;
         try{
-            ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId());
+            ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
         } catch (Exception e){}
         if(discountedAmount == 0f){
             try{
@@ -147,14 +158,21 @@ public class PaymentDetailService {
                 creditCard.charge(detail.getAmount());
             }
         }
+        CardTransaction transaction;
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
+        if(discountedAmount == 0f) {
+            transaction = new CardTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), creditCard.getCardNumber());
+        } else {
+            transaction = new CardTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), creditCard.getCardNumber());
+        }
         bankAccountRepository.save(restaurantAccount);
         creditCardRepository.save(creditCard);
+        cardTransactionRepository.save(transaction);
         return checkStatusAndSendEmail(detail);
     }
 
     @Transactional
-    protected ResponseEntity payWithPayPal(PaymentDetail detail){
+    protected ResponseEntity payWithPayPal(PaymentDetail detail) throws Exception {
         PayPalAccount account = paypalAccountRepository.findByUserId(detail.getUserId()).orElse(null);
         if(account == null)
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("L'utente non ha un account PayPal associato! Associane uno prima di effettuare il pagamento!");
@@ -172,7 +190,7 @@ public class PaymentDetailService {
 
         double discountedAmount = 0f;
         try{
-            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId());
+            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
         } catch (Exception e){}
         if(discountedAmount == 0f){
             try{
@@ -189,18 +207,36 @@ public class PaymentDetailService {
                 account.charge(detail.getAmount());
             }
         }
+        PayPalTransaction transaction;
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
+        if(discountedAmount == 0f) {
+            transaction = new PayPalTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), account.getId());
+        } else {
+            transaction = new PayPalTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType().toString(), account.getId());
+        }
         bankAccountRepository.save(restaurantAccount);
         paypalAccountRepository.save(account);
+        payPalTransactionRepository.save(transaction);
         return checkStatusAndSendEmail(detail);
     }
 
     // Solo gli employee del ristorante devono poter consentire il pagamento con contanti
     @Transactional
-    protected ResponseEntity payWithCash(PaymentDetail detail){
+    protected ResponseEntity payWithCash(PaymentDetail detail, int employeeId) throws Exception {
         Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
         if(payment == null)
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il pagamento associato!");
+
+        Client client = ClientBuilder.newClient();
+        WebTarget target = client.target("http://localhost:8087/employee/" + employeeId);
+        Employee employee = null;
+        try{
+            employee = target.request()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(Employee.class);
+        }catch (Exception e){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il dipendente!");
+        }
 
         BankAccount restaurantAccount = bankAccountRepository.findById(payment.getRestaurantPayeeId()).orElse(null);
         if(restaurantAccount == null)
@@ -210,7 +246,10 @@ public class PaymentDetailService {
         try{
             ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
         } catch (Exception e){}
+        CashTransaction transaction = new CashTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), employee.getRestaurantId(), payment.getPaymentType().toString(), employee.getId());
         bankAccountRepository.save(restaurantAccount);
+        cashTransactionRepository.save(transaction);
+        client.close();
         return checkStatusAndSendEmail(detail);
     }
 
@@ -422,6 +461,69 @@ class MenuItem {
 
     public int getId() {
         return id;
+    }
+}
+
+class Employee{
+    private int id;
+    private String username;
+    private String email;
+    private String password;
+    private String role;
+    private int restaurantId;
+
+    protected Employee() {this.role = "EMPLOYEE";}
+
+    public Employee(String username, String email, String password, int restaurantId) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.restaurantId = restaurantId;
+        this.role = "EMPLOYEE";
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public int getRestaurantId() {
+        return restaurantId;
+    }
+
+    public void setRestaurantId(int restaurantId) {
+        this.restaurantId = restaurantId;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }
 

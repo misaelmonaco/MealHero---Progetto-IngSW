@@ -2,6 +2,7 @@ package it.unisannio.paymentmanagementservice.service;
 
 import it.unisannio.paymentmanagementservice.model.entity.BankAccount;
 import it.unisannio.paymentmanagementservice.model.Customer;
+import it.unisannio.paymentmanagementservice.model.entity.BankAccountTransaction;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -40,7 +41,8 @@ public class ScoreService {
         }
     }
 
-    public static double checkAndCalculateDiscount(double amount, int userId){
+    public static double checkAndCalculateDiscount(double amount, int userId, int restaurantPayeeId, String currency) throws Exception {
+
         Client client = ClientBuilder.newClient();
         WebTarget target = client.target("http://localhost:8087/customer/");
         WebTarget resource = target.path(String.valueOf(userId));
@@ -96,6 +98,13 @@ public class ScoreService {
         } catch (Exception e){
             System.err.println("Impossibile aggiornare il conto bancario di MealHero!");
             return 0f;
+        }
+
+        client.target("http://localhost:8086/transaction/add");
+        BankAccountTransaction transaction = new BankAccountTransaction(bankAccount.getId(), restaurantPayeeId, discountAmount, currency);
+        Response response = resource.request().post(Entity.entity(transaction, MediaType.APPLICATION_JSON));
+        if(response.getStatus() != 201){
+            System.err.println("ATTENZIONE! È stato effettuato un pagamento ma non è stato possibile generare la corrispondente tansazione! \nUserId: " + userId + "\nRestaurantPayeeId: " + restaurantPayeeId + "\nAmount: " + discountAmount + "\nCurrency: " + currency);
         }
 
         return finalAmount;

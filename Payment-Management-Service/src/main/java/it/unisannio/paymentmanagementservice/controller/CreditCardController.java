@@ -24,7 +24,7 @@ public class CreditCardController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity updateCreditCard(@PathVariable Integer id, @RequestBody CreditCard creditCard) {
+    public ResponseEntity updateCreditCard(@PathVariable Integer id, @RequestBody CreditCard creditCard) throws Exception {
         return creditCardService.updateCreditCard(id, creditCard);
     }
 
@@ -50,14 +50,14 @@ public class CreditCardController {
     }
 
     @GetMapping("/cardNumber/{cardNumber}")
-    public ResponseEntity getCreditCardByCardNumber(@PathVariable String cardNumber) {
+    public ResponseEntity getCreditCardByCardNumber(@PathVariable String cardNumber) throws Exception {
         if(creditCardService.getCreditCardByCardNumber(cardNumber) == null)
             return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(creditCardService.getCreditCardByCardNumber(cardNumber) == null);
+        return ResponseEntity.ok(creditCardService.getCreditCardByCardNumber(cardNumber));
     }
 
     @GetMapping("/holderName/{holderName}")
-    public ResponseEntity getCreditCardByHolderName(@PathVariable String holderName) {
+    public ResponseEntity getCreditCardByHolderName(@PathVariable String holderName) throws Exception {
         if(!creditCardService.getCreditCardByHolderName(holderName).iterator().hasNext())
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok(creditCardService.getCreditCardByHolderName(holderName));

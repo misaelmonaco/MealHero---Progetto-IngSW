@@ -24,7 +24,7 @@ public class PayPalAccountController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity update(@PathVariable Integer id, @RequestBody PayPalAccount payPalAccount) {
+    public ResponseEntity update(@PathVariable Integer id, @RequestBody PayPalAccount payPalAccount) throws Exception {
         return payPalAccountService.updatePayPalAccount(id, payPalAccount);
     }
 
@@ -50,7 +50,7 @@ public class PayPalAccountController {
     }
 
     @GetMapping("/email/{email}")
-    public ResponseEntity getByEmail(@PathVariable String email) {
+    public ResponseEntity getByEmail(@PathVariable String email) throws Exception {
         if(payPalAccountService.getPayPalAccountByEmail(email) == null)
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok().body(payPalAccountService.getPayPalAccountByEmail(email));

@@ -9,12 +9,12 @@ import java.util.Optional;
 
 public interface CreditCardRepository extends CrudRepository<CreditCard, Integer> {
 
-    @Query("SELECT c FROM CreditCard c WHERE c.userId =: userId")
+    @Query("SELECT c FROM CreditCard c WHERE c.userId =:userId")
     Optional<CreditCard> findByUserId(@Param("userId") Integer userId);
 
-    @Query("SELECT c FROM CreditCard c WHERE c.cardNumber =: cardNumber")
+    @Query("SELECT c FROM CreditCard c WHERE c.cardNumber =:cardNumber")
     Optional<CreditCard> getByCardNumber(@Param("cardNumber") String cardNumber);
 
-    @Query("SELECT c FROM CreditCard c WHERE c.cardHolderName =: holderName")
+    @Query("SELECT c FROM CreditCard c WHERE c.cardHolderName =:holderName")
     Iterable<CreditCard> getByHolderName(@Param("holderName") String holderName);
 }
