@@ -6,7 +6,7 @@
 
 Questa è la struttura dell'architettura di MealHero:
 
-- [ ] (Documentation/MealHeroStructureDiagram.png)
+![ ] (Documentation/MealHeroStructureDiagram.png)
 
 ## Add your files
 
