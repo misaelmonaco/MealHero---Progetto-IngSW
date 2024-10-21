@@ -2,11 +2,11 @@
 
 
 
-## Getting started
+## Architecture documentation
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Questa è la struttura dell'architettura di MealHero:
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- [ ] (Documentation/MealHeroStructureDiagram.png)
 
 ## Add your files
 
