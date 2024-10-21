@@ -1,6 +1,7 @@
 package it.unisannio.paymentmanagementservice.service;
 
 import it.unisannio.paymentmanagementservice.model.Customer;
+import it.unisannio.paymentmanagementservice.model.PaymentStatus;
 import it.unisannio.paymentmanagementservice.model.entity.*;
 import it.unisannio.paymentmanagementservice.model.PaymentMethod;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
@@ -46,6 +47,7 @@ public class PaymentDetailService {
 
     @Autowired
     private CardTransactionRepository cardTransactionRepository;
+
     @Autowired
     private CashTransactionRepository cashTransactionRepository;
 
@@ -54,6 +56,9 @@ public class PaymentDetailService {
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
         if(detail == null)
             return ResponseEntity.notFound().build();
+
+        if(detail.isPaid())
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Il pagamento con id " + detail.getId() + " è già stato effettuato e non può essere più modificato!");
 
         detail.setPaymentMethod(PaymentMethod.valueOf(method));
 
@@ -68,6 +73,9 @@ public class PaymentDetailService {
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
         if(detail == null)
             return ResponseEntity.notFound().build();
+
+        if(detail.isPaid())
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Il pagamento con id " + detail.getId() + " è già stato effettuato!");
 
         ResponseEntity responseEntity;
         switch(detail.getPaymentMethod()){
@@ -92,6 +100,10 @@ public class PaymentDetailService {
 
     public PaymentDetail getById(int id){
         return paymentDetailRepository.findById(id).orElse(null);
+    }
+
+    public PaymentDetail getByUserAndPaymentId(int userId, int paymentId){
+        return paymentDetailRepository.findByUserAndPaymentId(userId, paymentId);
     }
 
     public Iterable<PaymentDetail> getByUserId(int userId){
@@ -140,7 +152,7 @@ public class PaymentDetailService {
 
         double discountedAmount = 0f;
         try{
-            ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
+            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
         } catch (Exception e){}
         if(discountedAmount == 0f){
             try{
@@ -206,7 +218,7 @@ public class PaymentDetailService {
                 account.charge(detail.getAmount());
             }
         }
-        PayPalTransaction transaction;
+        PayPalTransaction transaction = null;
         restaurantAccount.setBalance(restaurantAccount.getBalance() + detail.getAmount());
         if(discountedAmount == 0f) {
             transaction = new PayPalTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), account.getId());
@@ -266,21 +278,25 @@ public class PaymentDetailService {
 
     private ResponseEntity checkPaymentStatus(PaymentDetail detail){
         detail.togglePaid();
+        detail.setStatus(PaymentStatus.PAID);
         paymentDetailRepository.save(detail);
 
         Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
         if(payment == null) //Non dovrebbe accadere mai
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato!");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato per aggiornarne lo stato!");
         switch (payment.getStatus()){
-            case NOT_PAYED:
-                payment.setStatus("PARTIALLY_PAID");
+            case NOT_PAID:
+                if(payment.getPaymentType() == PaymentType.ALL_IN_ONE)
+                    payment.setStatus("PAID");
+                else
+                    payment.setStatus("PARTIALLY_PAID");
                 paymentRepository.save(payment);
                 break;
             case PARTIALLY_PAID:
                 Iterable<PaymentDetail> details = paymentDetailRepository.findByPaymentId(detail.getId());
                 boolean allPaid = true;
                 for (PaymentDetail pd : details) {
-                    if (!pd.isPaid()) {
+                    if (!pd.getStatus().equals(PaymentStatus.PAID)) {
                         allPaid = false;
                         break;
                     }
@@ -288,8 +304,8 @@ public class PaymentDetailService {
                 if (allPaid) {
                     payment.setStatus("PAID");
                     paymentRepository.save(payment);
-                    break;
                 }
+                break;
             case PAID:
                 break;
 
@@ -307,8 +323,11 @@ public class PaymentDetailService {
         if(payment == null) //Non dovrebbe accadere mai
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato!");
         switch (payment.getStatus()){
-            case NOT_PAYED:
-                payment.setStatus("PARTIALLY_PAID");
+            case NOT_PAID:
+                if(payment.getPaymentType() == PaymentType.ALL_IN_ONE)
+                    payment.setStatus("PAID");
+                else
+                    payment.setStatus("PARTIALLY_PAID");
                 paymentRepository.save(payment);
                 break;
 

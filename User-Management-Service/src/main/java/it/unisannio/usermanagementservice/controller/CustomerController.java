@@ -36,6 +36,11 @@ public class CustomerController {
         return customerService.updateScore(score, id);
     }
 
+    @PutMapping("/score/subtract/{score}/{id}")
+    public ResponseEntity subtractScore(@PathVariable int score, @PathVariable int id) {
+        return customerService.subtractScore(score, id);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity getCustomer(@PathVariable int id) {
         if(customerService.findCustomerById(id) == null)

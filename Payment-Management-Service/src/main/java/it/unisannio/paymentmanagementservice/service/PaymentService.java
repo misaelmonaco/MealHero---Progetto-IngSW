@@ -2,7 +2,6 @@ package it.unisannio.paymentmanagementservice.service;
 
 import it.unisannio.paymentmanagementservice.model.Customer;
 import it.unisannio.paymentmanagementservice.model.PaymentStatus;
-import it.unisannio.paymentmanagementservice.model.PaymentType;
 import it.unisannio.paymentmanagementservice.model.entity.Payment;
 import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
@@ -50,8 +49,18 @@ public class PaymentService {
         if(payment.getPaymentType() == EQUALLY_SPLIT && userIds.size() != 1)
             response = equally_split_payment(payment, userIds);
 
+        if(payment.getPaymentType() == EQUALLY_SPLIT && userIds.size() == 1){
+            payment.setPaymentType("ALL_IN_ONE");
+            response = all_in_one_payment(payment, userIds);
+        }
+
         if(payment.getPaymentType() == PERSONALLY_SPLIT && userIds.size() != 1)
             response = personally_split_payment(payment, userIds);
+
+        if(payment.getPaymentType() == PERSONALLY_SPLIT && userIds.size() == 1){
+            payment.setPaymentType("ALL_IN_ONE");
+            response = all_in_one_payment(payment, userIds);
+        }
 
         return response;
     }
@@ -93,10 +102,10 @@ public class PaymentService {
 
     private ResponseEntity all_in_one_payment(Payment payment, List<Integer> userIds) {
 
-        payment.setStatus("NOT_PAYED");
+        payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
         PaymentDetail detail = new PaymentDetail(userIds.get(0), payment.getId(), payment.getAmount(), false);
-        detail.setStatus(PaymentStatus.NOT_PAYED);
+        detail.setStatus(PaymentStatus.NOT_PAID);
         detail.setType(ALL_IN_ONE);
         paymentDetailRepository.save(detail);
         ResponseEntity response = sendPaymentEmail(userIds.get(0), detail);
@@ -106,19 +115,19 @@ public class PaymentService {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Registrazione del pagamento fallita --> Non è stato possibile inviare una mail a tutti gli users!");
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Controlla l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
     }
 
     @Transactional
     protected ResponseEntity equally_split_payment(Payment payment, List<Integer> userIds) {
 
-        payment.setStatus("NOT_PAYED");
+        payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
         float amount = payment.getAmount()/(float)userIds.size();
 
         for (Integer userId : userIds) {
             PaymentDetail detail = new PaymentDetail(userId, payment.getId(), amount, false);
-            detail.setStatus(PaymentStatus.NOT_PAYED);
+            detail.setStatus(PaymentStatus.NOT_PAID);
             detail.setType(EQUALLY_SPLIT);
             paymentDetailRepository.save(detail);
             ResponseEntity response = sendPaymentEmail(userId, detail);
@@ -128,16 +137,16 @@ public class PaymentService {
                 return response;
             }
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Controlla l'area personale per effettuare la transazione!");
+        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
     }
 
     private ResponseEntity personally_split_payment(Payment payment, List<Integer> userIds) {
-        payment.setStatus("NOT_PAYED");
+        payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
 
         for (Integer userId : userIds) {
             PaymentDetail detail = new PaymentDetail(userId, payment.getId(), 0f, false);
-            detail.setStatus(PaymentStatus.NOT_PAYED);
+            detail.setStatus(PaymentStatus.NOT_PAID);
             detail.setType(PERSONALLY_SPLIT);
             paymentDetailRepository.save(detail);
             ResponseEntity response = sendPaymentEmail(userId, detail);
@@ -147,7 +156,7 @@ public class PaymentService {
                 return response;
             }
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Controlla l'area personale per effettuare la transazione!");
+        return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
     }
 
     private ResponseEntity sendPaymentEmail(Integer userId, PaymentDetail detail) {

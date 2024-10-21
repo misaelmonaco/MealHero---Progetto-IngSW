@@ -1,6 +1,5 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
-import it.unisannio.paymentmanagementservice.model.PaymentMethod;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.Entity;
 

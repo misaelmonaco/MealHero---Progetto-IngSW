@@ -89,7 +89,7 @@ public class CreditCard {
     }
 
     public boolean hasSufficientBalance(double amount) throws Exception {
-        return getBalance() >= amount;
+        return this.balance >= amount;
     }
 
     public int getUserId() {

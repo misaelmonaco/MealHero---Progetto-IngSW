@@ -14,7 +14,7 @@ public class PayPalAccountController {
     private PayPalAccountService payPalAccountService;
 
     @PostMapping("/add")
-    public ResponseEntity add(@RequestBody PayPalAccount payPalAccount) {
+    public ResponseEntity add(@RequestBody PayPalAccount payPalAccount) throws Exception {
         return payPalAccountService.addPayPalAccount(payPalAccount);
     }
 

@@ -74,17 +74,17 @@ public class ScoreService {
             finalAmount = amount * 0.05;
         }
 
-        resource = target.path("score/" + (-customer.getScore()) + "/" + customer.getId());
+        resource = target.path("score/subtract/" + (customer.getScore()) + "/" + customer.getId());
         try{
-            Response response = resource.request().put(null);
+            Response response = resource.request().put(Entity.text(""));
         } catch (Exception e){
-            System.err.println("Impossibile rimuovere tutti i punti dall'utente con id " + userId + "!\n" + e.getMessage());
+            System.err.println("Impossibile rimuovere i punti dall'utente con id " + userId + "!\n" + e.getMessage());
             return 0f;
         }
 
         //Crea il conto bancario di MealHero
         target = client.target("http://localhost:8086/bankAccount/");
-        resource = target.path(String.valueOf(3));
+        resource = target.path(String.valueOf(9));
         BankAccount bankAccount = null;
         try{
             bankAccount = resource.request()
@@ -96,7 +96,7 @@ public class ScoreService {
         }
         bankAccount.setBalance(bankAccount.getBalance() - discountAmount);
 
-        resource = target.path("update/3");
+        resource = target.path("update/9");
         try{
             Response put = resource.request().put(Entity.entity(bankAccount, MediaType.APPLICATION_JSON));
         } catch (Exception e){
@@ -104,7 +104,7 @@ public class ScoreService {
             return 0f;
         }
 
-        client.target("http://localhost:8086/transaction/add");
+        resource = client.target("http://localhost:8086/bankAccountTransaction/add");
         BankAccountTransaction transaction = new BankAccountTransaction(bankAccount.getId(), restaurantPayeeId, discountAmount, currency);
         Response response = resource.request().post(Entity.entity(transaction, MediaType.APPLICATION_JSON));
         if(response.getStatus() != 201){

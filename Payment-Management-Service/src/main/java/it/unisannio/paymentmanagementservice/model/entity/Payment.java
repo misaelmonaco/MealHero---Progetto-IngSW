@@ -38,7 +38,7 @@ public class Payment {
         this.amount = amount;
         this.currency = Currency.valueOf(currency);
         this.paymentType = PaymentType.valueOf(paymentType);
-        this.status = PaymentStatus.NOT_PAYED;
+        this.status = PaymentStatus.NOT_PAID;
     }
 
     public int getId() {

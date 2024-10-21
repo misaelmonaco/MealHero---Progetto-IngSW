@@ -16,7 +16,16 @@ public class PayPalAccountService {
     @Autowired
     private PayPalAccountRepository payPalAccountRepository;
 
-    public ResponseEntity addPayPalAccount(PayPalAccount payPalAccount) {
+    public ResponseEntity addPayPalAccount(PayPalAccount payPalAccount) throws Exception {
+        if(payPalAccountRepository.findByUserId(payPalAccount.getUserId()).isPresent())
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Già esiste un account per l'user associato!");
+
+        if(payPalAccountRepository.findByEmail(payPalAccount.getEmail()).isPresent())
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Già esiste un account per l'email associata!");
+
+        if(payPalAccount.getPassword().contains(" "))
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La password non può contenere spazi vuoti!");
+
         payPalAccountRepository.save(payPalAccount);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }

@@ -38,16 +38,23 @@ public class PaymentDetailController {
 
     @GetMapping("/payment/{paymentId}")
     public ResponseEntity getByPaymentId(@PathVariable Integer paymentId) {
-        if(paymentDetailService.getByPaymentId(paymentId) == null)
+        if(!paymentDetailService.getByPaymentId(paymentId).iterator().hasNext())
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok(paymentDetailService.getByPaymentId(paymentId));
     }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity getByUserId(@PathVariable Integer userId) {
-        if(paymentDetailService.getByUserId(userId) == null)
+        if(!paymentDetailService.getByUserId(userId).iterator().hasNext())
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok(paymentDetailService.getByUserId(userId));
+    }
+
+    @GetMapping("/user/{userId}/payment/{paymentId}")
+    public ResponseEntity getByPaymentIdAndUserId(@PathVariable Integer userId, @PathVariable Integer paymentId) {
+        if(paymentDetailService.getByUserAndPaymentId(userId, paymentId) == null)
+            return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(paymentDetailService.getByUserAndPaymentId(userId, paymentId));
     }
 
     @GetMapping("/all")
