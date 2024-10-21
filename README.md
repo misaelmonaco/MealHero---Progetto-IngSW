@@ -4,9 +4,7 @@
 
 ## Architecture documentation
 
-Questa è la struttura dell'architettura di MealHero:
-
-![ ] (Documentation/MealHeroStructureDiagram.png)
+![Questa è la struttura dell'architettura di MealHero](Documentation/MealHeroStructureDiagram.png)
 
 ## Add your files
 
