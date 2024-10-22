@@ -40,6 +40,18 @@ public class MenuItemService {
         return ResponseEntity.status(HttpStatus.OK).body("Item aggiornato con successo");
     }
 
+    public ResponseEntity toggleAvability(int menuItemId){
+        MenuItem existingItem = menuItemRepository.findById(menuItemId).orElse(null);
+        if (existingItem == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Item non trovato");
+        }
+
+        existingItem.toogleAvailable();
+        menuItemRepository.save(existingItem);
+
+        return ResponseEntity.status(HttpStatus.OK).body("Item aggiornato con successo");
+    }
+
     public Iterable<MenuItem> getMenuItems() {
         return menuItemRepository.findAll();
     }

@@ -1,11 +1,9 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
 import it.unisannio.paymentmanagementservice.model.Currency;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,7 +17,8 @@ public class BankAccountTransaction {
 
     private int bankAccountReceiverId;
 
-    private double amount;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;
 
     private LocalDateTime transactionDate;
 
@@ -27,7 +26,7 @@ public class BankAccountTransaction {
 
     protected BankAccountTransaction() { this.transactionDate = LocalDateTime.now();}
 
-    public BankAccountTransaction(int bankAccountSenderId, int bankAccountReceiverId, double amount, String currency) {
+    public BankAccountTransaction(int bankAccountSenderId, int bankAccountReceiverId, BigDecimal amount, String currency) {
         this.bankAccountSenderId = bankAccountSenderId;
         this.bankAccountReceiverId = bankAccountReceiverId;
         this.amount = amount;
@@ -71,11 +70,11 @@ public class BankAccountTransaction {
         this.bankAccountSenderId = bankAccountSenderId;
     }
 
-    public double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 }

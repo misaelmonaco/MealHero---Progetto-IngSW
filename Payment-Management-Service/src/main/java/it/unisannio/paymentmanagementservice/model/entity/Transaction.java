@@ -5,6 +5,7 @@ import it.unisannio.paymentmanagementservice.model.PaymentMethod;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 
@@ -16,7 +17,8 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.SEQUENCE)
     private int id;
 
-    private double amount;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;
 
     private Currency currency;
 
@@ -33,7 +35,7 @@ public class Transaction {
 
     protected Transaction() {this.transactionDateTime = LocalDateTime.now();}
 
-    public Transaction(double amount, String currency, int userId, int restaurantId, PaymentType paymentType) {
+    public Transaction(BigDecimal amount, String currency, int userId, int restaurantId, PaymentType paymentType) {
         this.amount = amount;
         this.currency = Currency.valueOf(currency);
         this.userId = userId;
@@ -46,11 +48,11 @@ public class Transaction {
         return id;
     }
 
-    public double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(double amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 

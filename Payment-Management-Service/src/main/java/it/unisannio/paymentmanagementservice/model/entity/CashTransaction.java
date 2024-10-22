@@ -3,6 +3,8 @@ package it.unisannio.paymentmanagementservice.model.entity;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.Entity;
 
+import java.math.BigDecimal;
+
 @Entity
 public class CashTransaction extends Transaction {
 
@@ -10,7 +12,7 @@ public class CashTransaction extends Transaction {
 
     protected CashTransaction() {super.setPaymentMethod("CASH");}
 
-    public CashTransaction(double amount, String currency, int userId, int restaurantId, PaymentType paymentType, int employeeId) {
+    public CashTransaction(BigDecimal amount, String currency, int userId, int restaurantId, PaymentType paymentType, int employeeId) {
         super(amount, currency, userId, restaurantId, paymentType);
         super.setPaymentMethod("CASH");
         this.employeeId = employeeId;

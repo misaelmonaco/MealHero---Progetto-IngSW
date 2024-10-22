@@ -3,6 +3,7 @@ package it.unisannio.paymentmanagementservice.model.entity;
 import it.unisannio.paymentmanagementservice.model.AESEncryption;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.util.Base64;
 
 @Entity
@@ -21,8 +22,8 @@ public class BankAccount {
     @Column(nullable = false)
     private String accountHolderName;
 
-    @Column(nullable = false)
-    private double balance;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal balance;
 
     public BankAccount() {}
 
@@ -30,7 +31,7 @@ public class BankAccount {
         this.restaurantId = restaurantId;
         this.iban = AESEncryption.encrypt(Base64.getEncoder().encodeToString(iban.getBytes()));
         this.accountHolderName = AESEncryption.encrypt(Base64.getEncoder().encodeToString(accountHolderName.getBytes()));
-        this.balance = 0;
+        this.balance = BigDecimal.ZERO;
     }
 
 
@@ -58,7 +59,7 @@ public class BankAccount {
         this.accountHolderName = AESEncryption.encrypt(Base64.getEncoder().encodeToString(accountHolderName.getBytes()));
     }
 
-    public double getBalance() throws Exception {
+    public BigDecimal getBalance() throws Exception {
         return this.balance;
     }
 
@@ -66,17 +67,17 @@ public class BankAccount {
         return restaurantId;
     }
 
-    public void setBalance(double balance) throws Exception {
+    public void setBalance(BigDecimal balance) throws Exception {
         this.balance = balance;
     }
 
-    public boolean hasSufficientBalance(double amount) throws Exception {
-        return this.balance >= amount;
+    public boolean hasSufficientBalance(BigDecimal amount) throws Exception {
+        return this.balance.compareTo(amount) >= 0;
     }
 
-    public void charge(double amount) throws Exception {
+    public void charge(BigDecimal amount) throws Exception {
         if (hasSufficientBalance(amount)) {
-            setBalance(this.balance - amount);
+            setBalance(this.balance.subtract(amount));
             System.out.println("Addebitato " + amount + " dal conto bancario. Nuovo saldo: " + this.balance);
         } else {
             throw new IllegalArgumentException("Saldo bancario insufficiente.");

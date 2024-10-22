@@ -3,6 +3,7 @@ package it.unisannio.paymentmanagementservice.model.entity;
 import it.unisannio.paymentmanagementservice.model.AESEncryption;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.util.Base64;
 
 @Entity
@@ -21,12 +22,12 @@ public class PayPalAccount {
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false)
-    private double balance;
+    @Column(nullable = false, scale = 2, precision = 10)
+    private BigDecimal balance;
 
     public PayPalAccount() {}
 
-    public PayPalAccount(int userId, String email, String password, double balance) throws Exception {
+    public PayPalAccount(int userId, String email, String password, BigDecimal balance) throws Exception {
         this.userId = userId;
         this.email = AESEncryption.encrypt(Base64.getEncoder().encodeToString(email.getBytes()));;
         this.password = AESEncryption.encrypt(Base64.getEncoder().encodeToString(password.getBytes()));
@@ -58,7 +59,7 @@ public class PayPalAccount {
         this.password = AESEncryption.encrypt(Base64.getEncoder().encodeToString(password.getBytes()));
     }
 
-    public double getBalance() throws Exception {
+    public BigDecimal getBalance() throws Exception {
         return this.balance;
     }
 
@@ -66,17 +67,17 @@ public class PayPalAccount {
         return userId;
     }
 
-    public void setBalance(double balance) throws Exception {
+    public void setBalance(BigDecimal balance) throws Exception {
         this.balance = balance;
     }
 
-    public boolean hasSufficientBalance(double amount) throws Exception {
-        return this.balance >= amount;
+    public boolean hasSufficientBalance(BigDecimal amount) throws Exception {
+        return this.balance.compareTo(amount) >= 0;
     }
 
-    public void charge(double amount) throws Exception {
+    public void charge(BigDecimal amount) throws Exception {
         if (hasSufficientBalance(amount)) {
-            setBalance(this.balance - amount);
+            setBalance(this.balance.subtract(amount));
         } else {
             throw new IllegalArgumentException("Saldo PayPal insufficiente");
         }

@@ -13,4 +13,7 @@ public interface UserOrderDetailRepository extends CrudRepository<UserOrderDetai
 
     @Query("SELECT o FROM UserOrderDetail o WHERE o.orderId =:orderId")
     Iterable<UserOrderDetail> findByOrderId(@Param("orderId") int orderId);
+
+    @Query("SELECT o FROM UserOrderDetail o WHERE o.orderId =:orderId AND o.menuItemId =:menuItemId")
+    Iterable<UserOrderDetail> findByOrderIdAndMenuItemId(@Param("orderId") int orderId, @Param("menuItemId") int menuItemId);
 }

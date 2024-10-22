@@ -7,6 +7,7 @@ import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
 import it.unisannio.paymentmanagementservice.repository.PaymentRepository;
 import jakarta.transaction.Transactional;
+import jakarta.validation.constraints.Email;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -19,7 +20,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import static it.unisannio.paymentmanagementservice.model.PaymentType.*;
@@ -104,15 +109,26 @@ public class PaymentService {
 
         payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
-        PaymentDetail detail = new PaymentDetail(userIds.get(0), payment.getId(), payment.getAmount(), false);
+        PaymentDetail detail = new PaymentDetail(userIds.get(0), payment.getId(), payment.getAmount());
         detail.setStatus(PaymentStatus.NOT_PAID);
         detail.setType(ALL_IN_ONE);
         paymentDetailRepository.save(detail);
-        ResponseEntity response = sendPaymentEmail(userIds.get(0), detail);
+
+        ArrayList<String> email = new ArrayList<>();
+        ResponseEntity response = findUserEmail(userIds.get(0), payment, email);
+        if(!(response.getStatusCode().is2xxSuccessful())){
+            paymentDetailRepository.deleteByPaymentId(payment.getId());
+            paymentRepository.delete(payment);
+            return response;
+        }
+
+        response = null;
+
+        response = sendPaymentEmail(email);
         if(!(response.getStatusCode().is2xxSuccessful())){
             paymentDetailRepository.delete(detail);
             paymentRepository.delete(payment);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Registrazione del pagamento fallita --> Non è stato possibile inviare una mail a tutti gli users!");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Registrazione del pagamento fallita --> Non è stato possibile inviare una mail all'utente!");
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
@@ -123,19 +139,36 @@ public class PaymentService {
 
         payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
-        float amount = payment.getAmount()/(float)userIds.size();
+        BigDecimal amount = payment.getAmount().divide(BigDecimal.valueOf(Double.parseDouble(String.valueOf(userIds.size()))), 2, RoundingMode.HALF_UP);
+        BigDecimal remainder = payment.getAmount().remainder(BigDecimal.valueOf(Double.parseDouble(String.valueOf(userIds.size()))));
+        int i = 0;
+        int remainderValue = remainder.intValue();
 
+        ArrayList<String> emails = new ArrayList<>();
         for (Integer userId : userIds) {
-            PaymentDetail detail = new PaymentDetail(userId, payment.getId(), amount, false);
+            PaymentDetail detail;
+            if( i < remainderValue){
+                i++;
+                detail = new PaymentDetail(userId, payment.getId(), amount.add(new BigDecimal("0.01")));
+            } else
+                detail = new PaymentDetail(userId, payment.getId(), amount);
             detail.setStatus(PaymentStatus.NOT_PAID);
             detail.setType(EQUALLY_SPLIT);
             paymentDetailRepository.save(detail);
-            ResponseEntity response = sendPaymentEmail(userId, detail);
-            if(!(response.getStatusCode().is2xxSuccessful())){
+
+            ResponseEntity response = findUserEmail(userId, payment, emails);
+            if(!response.getStatusCode().is2xxSuccessful()){
                 paymentDetailRepository.deleteByPaymentId(payment.getId());
                 paymentRepository.delete(payment);
                 return response;
             }
+        }
+
+        ResponseEntity response = sendPaymentEmail(emails);
+        if(!(response.getStatusCode().is2xxSuccessful())){
+            paymentDetailRepository.deleteByPaymentId(payment.getId());
+            paymentRepository.delete(payment);
+            return response;
         }
         return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
     }
@@ -144,24 +177,58 @@ public class PaymentService {
         payment.setStatus("NOT_PAID");
         paymentRepository.save(payment);
 
+        ArrayList<String> emails = new ArrayList<>();
         for (Integer userId : userIds) {
-            PaymentDetail detail = new PaymentDetail(userId, payment.getId(), 0f, false);
+            PaymentDetail detail = new PaymentDetail(userId, payment.getId(), BigDecimal.ZERO);
             detail.setStatus(PaymentStatus.NOT_PAID);
             detail.setType(PERSONALLY_SPLIT);
             paymentDetailRepository.save(detail);
-            ResponseEntity response = sendPaymentEmail(userId, detail);
-            if(!(response.getStatusCode().is2xxSuccessful())){
+
+            ResponseEntity response = findUserEmail(userId, payment, emails);
+            if(!response.getStatusCode().is2xxSuccessful()){
                 paymentDetailRepository.deleteByPaymentId(payment.getId());
                 paymentRepository.delete(payment);
                 return response;
             }
         }
+        ResponseEntity response = sendPaymentEmail(emails);
+        if(!(response.getStatusCode().is2xxSuccessful())){
+            paymentDetailRepository.deleteByPaymentId(payment.getId());
+            paymentRepository.delete(payment);
+            return response;
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED).body("Pagamento registrato con successo! Ora i CUSTOMER possono controllare l'area personale per scegliere come effettuare la transazione!\n\nPayment id: " + payment.getId());
     }
 
-    private ResponseEntity sendPaymentEmail(Integer userId, PaymentDetail detail) {
+    private ResponseEntity sendPaymentEmail(ArrayList<String> emails) {
         Client client = ClientBuilder.newClient();
+        WebTarget resource = null;
+        try {
+            StringBuilder emailBuilder = new StringBuilder();
+            for (String email : emails) {
+                if (emailBuilder.length() > 0) {
+                    emailBuilder.append(",");
+                }
+                emailBuilder.append(URLEncoder.encode(email, "UTF-8"));
+            }
+            String subject = URLEncoder.encode("Nuovo Pagamento nella tua area personale", "UTF-8");
+            resource = client.target("http://localhost:8088/email/sendMoreThanOne?to=" + emailBuilder + "&subject=" + subject);
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        String body = "Nella tua area personale è stato aggiunto un nuovo pagamento!\nAccedi a MealHero per scegliere come desideri effettuare e completare la transazione!" +
+                "\n\nSe non trovi alcun pagamento nell'area personale, hai ricevuto questa mail per errore. \n\nQuesto è un indirizzo di posta no-reply. Non è possibile rispondere a questa email!";
+        Response response = resource.request().post(Entity.text(body));
+        if (!(response.getStatus() == 201))
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile inviare l'email a tutti i clienti! --> Response status: " + response.getStatus());
 
+        client.close();
+        return ResponseEntity.status(HttpStatus.CREATED).body("Email inviata con successo a " + emails.toString());
+    }
+
+    public ResponseEntity findUserEmail(int userId, Payment payment, ArrayList<String> emails) {
+        Client client = ClientBuilder.newClient();
         WebTarget resource = client.target("http://localhost:8087/customer/" + userId);
         Customer customer;
         try {
@@ -171,31 +238,20 @@ public class PaymentService {
 
             if (response.getStatus() == 200) {
                 customer = response.readEntity(Customer.class);
+                emails.add(customer.getEmail());
             } else {
                 System.err.println("Errore nella richiesta: " + response.getStatus() + " " + response.getStatusInfo());
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare l'user con id " + userId);
+                paymentDetailRepository.deleteByPaymentId(payment.getId());
+                paymentRepository.delete(payment);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare l'user con id " + userId + "\nResponse: " + response);
             }
         } catch (Exception e) {
             System.err.println("Errore durante la richiesta: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
 
-        try {
-            String email = URLEncoder.encode(customer.getEmail(), "UTF-8");
-            String subject = URLEncoder.encode("Nuovo Pagamento nella tua area personale", "UTF-8");
-
-            resource = client.target("http://localhost:8088/email/send?to=" + email + "&subject=" + subject);
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        String body = "Nella tua area personale è stato aggiunto un nuovo pagamento!\nAccedi a MealHero per scegliere come desideri effettuare e completare la transazione!" +
-                "\n\nSe non trovi alcun pagamento nell'area personale, hai ricevuto questa mail per errore. \n\nQuesto è un indirizzo di posta no-reply. Non è possibile rispondere a questa email!";
-        Response response = resource.request().post(Entity.text(body));
-        if (!(response.getStatus() == 201))
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile inviare l'email a " + customer.getEmail() + " --> Response status: " + response.getStatus());
-
         client.close();
-        return ResponseEntity.status(HttpStatus.CREATED).body("Email inviata con successo a " + customer.getEmail());
+        return ResponseEntity.status(HttpStatus.OK).body(emails);
     }
 }
 

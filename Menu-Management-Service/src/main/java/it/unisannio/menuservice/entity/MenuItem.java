@@ -18,14 +18,17 @@ public class MenuItem {
     @Column(nullable = false)
     private double price;
 
+    private boolean available;
+
     private int menuId;
 
-    protected MenuItem(){}
+    protected MenuItem(){this.available = true;}
 
     public MenuItem(String name, String description, double price) {
         this.name = name;
         this.description = description;
         this.price = price;
+        this.available = true;
     }
 
     public int getMenuId() {
@@ -62,5 +65,13 @@ public class MenuItem {
 
     public int getId() {
         return id;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void toogleAvailable() {
+        this.available = !available;
     }
 }

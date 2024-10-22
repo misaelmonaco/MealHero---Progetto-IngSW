@@ -5,6 +5,8 @@ import it.unisannio.paymentmanagementservice.model.PaymentStatus;
 import it.unisannio.paymentmanagementservice.model.PaymentType;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
+
 @Entity
 public class PaymentDetail {
 
@@ -24,19 +26,15 @@ public class PaymentDetail {
 
     private PaymentMethod paymentMethod;
 
-    @Column(nullable = false)
-    private float amount;
-
-    @Column(nullable = false)
-    private boolean paid;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;
 
     protected PaymentDetail() {}
 
-    public PaymentDetail(int userId, int paymentId, float amount, boolean paid) {
+    public PaymentDetail(int userId, int paymentId, BigDecimal amount) {
         this.userId = userId;
         this.paymentId = paymentId;
         this.amount = amount;
-        this.paid = false;
         this.type = null;
     }
 
@@ -44,19 +42,11 @@ public class PaymentDetail {
         return id;
     }
 
-    public boolean isPaid() {
-        return paid;
-    }
-
-    public void togglePaid() {
-        this.paid = !this.paid;
-    }
-
-    public float getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(float amount) {
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
     }
 

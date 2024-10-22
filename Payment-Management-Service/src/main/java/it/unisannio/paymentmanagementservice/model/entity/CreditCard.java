@@ -1,5 +1,6 @@
 package it.unisannio.paymentmanagementservice.model.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Base64;
@@ -29,12 +30,12 @@ public class CreditCard {
     @Column(nullable = false)
     private String cvv;
 
-    @Column(nullable = false)
-    private double balance;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal balance;
 
     public CreditCard() {}
 
-    public CreditCard(int userId, String cardNumber, String cardHolderName, LocalDate expirationDate, String cvv, double balance) throws Exception {
+    public CreditCard(int userId, String cardNumber, String cardHolderName, LocalDate expirationDate, String cvv, BigDecimal balance) throws Exception {
         this.userId = userId;
         this.cardNumber = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardNumber.getBytes()));
         this.cardHolderName = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cardHolderName.getBytes()));;
@@ -80,25 +81,25 @@ public class CreditCard {
         this.cvv = AESEncryption.encrypt(Base64.getEncoder().encodeToString(cvv.getBytes()));
     }
 
-    public double getBalance() {
+    public BigDecimal getBalance() {
         return balance;
     }
 
-    public void setBalance(double balance) {
+    public void setBalance(BigDecimal balance) {
         this.balance = balance;
     }
 
-    public boolean hasSufficientBalance(double amount) throws Exception {
-        return this.balance >= amount;
+    public boolean hasSufficientBalance(BigDecimal amount) throws Exception {
+        return this.balance.compareTo(amount) >= 0;
     }
 
     public int getUserId() {
         return userId;
     }
 
-    public void charge(double amount) throws Exception {
+    public void charge(BigDecimal amount) throws Exception {
         if (hasSufficientBalance(amount)) {
-            setBalance(this.balance - amount);
+            setBalance(this.balance.subtract(amount));
         } else {
             throw new IllegalArgumentException("Saldo insufficiente");
         }
