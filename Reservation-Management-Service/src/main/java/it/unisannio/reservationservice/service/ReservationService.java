@@ -26,8 +26,8 @@ public class ReservationService {
     private ReservationRepository reservationRepository;
 
     public ResponseEntity addReservation(Reservation reservation) {
-        reservationRepository.save(reservation);
-        return ResponseEntity.ok().body("Prenotazione aggiunta con successo!");
+        Reservation res = reservationRepository.save(reservation);
+        return ResponseEntity.ok().body("Prenotazione aggiunta con successo!\nId: " + res.getId());
     }
 
     //La date deve essere nel formato "yyyy-MM-dd" e time nel formato "HH:MM"
@@ -40,20 +40,28 @@ public class ReservationService {
             return ResponseEntity.status(response.getStatusCode()).body("Non è stato possibile trovare un tavolo a quell'ora e per quella data!");
         }
         int tableId = (int)response.getBody();
+        if(tableId == 0)
+            return ResponseEntity.status(response.getStatusCode()).body("Non è stato possibile trovare un tavolo a quell'ora e per quella data!");
+
         int parkingSpotId = 0;
-
+        ParkingSpot spot = null;
         if(includeParkingSpot){
-            ResponseEntity response1 = findParkingSpot(restaurantId, numOfGuests, localDate, localTime);
-            if(!(response1.getStatusCode().is2xxSuccessful())){
-                return ResponseEntity.status(response1.getStatusCode()).body("Non è stato possibile trovare uno stallo auto a quell'ora e per quella data!");
-            }
-            ParkingSpot spot = (ParkingSpot) response1.getBody();
-            parkingSpotId = spot.getId();
+            try{
+                ResponseEntity response1 = findParkingSpot(restaurantId, numOfGuests, localDate, localTime);
+                spot = (ParkingSpot) response1.getBody();
+                parkingSpotId = spot.getId();
+            } catch (ClassCastException e){ }
         }
+        if(parkingSpotId == 0){
+            Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, false);
+            Reservation res = reservationRepository.save(newReservation);
+            return ResponseEntity.ok().body("ATTENZIONE!!: La prenotazione è stata aggiunta con successo ma non è stato possibile trovare un posto auto!\nId: " + res.getId());
 
-        Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, includeParkingSpot);
-        reservationRepository.save(newReservation);
-        return ResponseEntity.ok().body("Prenotazione aggiunta con successo!");
+        }else{
+            Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, includeParkingSpot);
+            Reservation res = reservationRepository.save(newReservation);
+            return ResponseEntity.ok().body("Prenotazione aggiunta con successo!\nId: " + res.getId());
+        }
     }
 
     public ResponseEntity deleteReservation(int reservationId){
@@ -130,12 +138,17 @@ public class ReservationService {
         WebTarget resource = endpoint.path("/table/byRestaurant/" + restaurantId);
 
         //Ottieni la lista di tavoli
-        List<RestaurantTable> tables = resource.request()
-                .accept(MediaType.APPLICATION_JSON)
-                .get(new GenericType<List<RestaurantTable>>() {});
+        List<RestaurantTable> tables = new ArrayList<>();
+        try{
+            tables = resource.request()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(new GenericType<List<RestaurantTable>>() {});
+        } catch(Exception e){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile recuperare i tavoli!");
+        }
 
-        if(tables == null || tables.isEmpty())
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if(tables.isEmpty())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non sono stati trovati tavoli!");
 
         //Ottieni la lista di prenotazioni per quello specifico ristorante
         List<Reservation> reservations = reservationRepository.findByRestaurantId(restaurantId);
@@ -181,13 +194,18 @@ public class ReservationService {
         List<ParkingSpot> parkingSpots = new ArrayList<>();
 
         // Ottieni la lista delle aree di parcheggio
-        List<ParkingArea> parkingAreas = resource.request()
-                .accept(MediaType.APPLICATION_JSON)
-                .get(new GenericType<List<ParkingArea>>() {});
+        List<ParkingArea> parkingAreas = new ArrayList<>();
 
-        if (parkingAreas == null || parkingAreas.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non sono state trovate aree parcheggio!");
+        try{
+            parkingAreas = resource.request()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(new GenericType<List<ParkingArea>>() {});
+        } catch(Exception e){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile trovare aree parcheggio!");
         }
+
+        if(parkingAreas.isEmpty())
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non sono state trovate aree parcheggio!");
 
         // Per ogni area di parcheggio, recupera i posti auto
         for (ParkingArea parkingArea : parkingAreas) {
@@ -223,6 +241,7 @@ public class ReservationService {
         // Se ci sono posti auto disponibili, restituisci il primo
         ParkingSpot selectedSpot = parkingSpots.get(0);
 
+        client.close();
         return ResponseEntity.ok(selectedSpot);
     }
 

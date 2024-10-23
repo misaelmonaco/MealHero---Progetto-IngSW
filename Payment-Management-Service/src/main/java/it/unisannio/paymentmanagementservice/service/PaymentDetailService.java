@@ -21,9 +21,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 import java.util.stream.StreamSupport;
 
 @Service
@@ -66,14 +63,14 @@ public class PaymentDetailService {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Il pagamento con id " + detail.getId() + " è già stato effettuato e non può essere più modificato!");
 
         detail.setPaymentMethod(PaymentMethod.valueOf(method));
-
-        if(detail.getAmount().equals(BigDecimal.ZERO)) //Siamo di fronte un PERSONALLY SPLIT Payment
+        if(detail.getType().equals(PaymentType.PERSONALLY_SPLIT))
             return updatePaymentDetailPersonallySplit(detail, detail.getUserId());
 
         paymentDetailRepository.save(detail);
         return ResponseEntity.ok().body("Metodo di pagamento selezionato, ora puoi procedere con la transazione!");
     }
 
+    @Transactional
     public ResponseEntity pay(int id, int employeeId) throws Exception {
         PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
         if(detail == null)
@@ -129,9 +126,9 @@ public class PaymentDetailService {
 
     // Metodo update per PERSONALLY_SPLIT
     private ResponseEntity updatePaymentDetailPersonallySplit(PaymentDetail detail, int userId){
-        BigDecimal amount = calculateUserAmount(userId);
+        BigDecimal amount = calculateUserAmount(userId, detail.getPaymentId());
         if(amount.equals(BigDecimal.ZERO))
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Non è stato possibile calcolare la somma da pagare!");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Non è stato possibile calcolare la somma da pagare oppure hai tentato di selezionare il metodo di pagamento prima di selezionare ciò che vuoi pagare!");
         detail.setAmount(amount);
         paymentDetailRepository.save(detail);
         return ResponseEntity.ok().body("Metodo di pagamento selezionato, ora puoi procedere con la transazione!");
@@ -269,22 +266,21 @@ public class PaymentDetailService {
         return checkStatusAndSendEmail(detail);
     }
 
-    private ResponseEntity checkStatusAndSendEmail(PaymentDetail detail){
+    @Transactional
+    protected ResponseEntity checkStatusAndSendEmail(PaymentDetail detail){
+        checkPaymentStatus(detail);
         Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
         if(payment.getPaymentType().equals(PaymentType.PERSONALLY_SPLIT)) {
-            ResponseEntity response = checkPayment(detail);
+            ResponseEntity response = checkPersonallySplitPayment(detail);
             if(!response.getStatusCode().is2xxSuccessful()){
                 paymentDetailRepository.deleteByPaymentIdAndStatus(detail.getPaymentId(), PaymentStatus.NOT_PAID);
-                return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body("Il pagamento in questione risulta già del tutto pagato!");
+                return ResponseEntity.status(HttpStatus.OK).body("Pagamento effettuato correttamente!\nIl pagamento in questione risulta del tutto pagato!");
             }
             if(response.getStatusCode().is5xxServerError())
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Per il pagamento in questione si è verificato un sovrappagamento");
-            checkPaymentStatus(detail);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Pagamento effettuato correttamente!\nPer il pagamento in questione si è verificato un sovrappagamento!");
         }
-        else
-            checkPaymentStatus(detail);
         if(sendProcessedPaymentEmail(detail).getStatusCode() != HttpStatus.CREATED)
-            return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("Il pagamento è stato effettuato correttamente ma non è stato possibile inviare l'email di conferma!");
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body("Il pagamento è stato effettuato correttamente ma non è stato possibile inviare l'email di conferma!");
 
         return ResponseEntity.ok().body("Pagamento effettuato correttamente!");
     }
@@ -319,7 +315,7 @@ public class PaymentDetailService {
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 
-    private ResponseEntity checkPayment(PaymentDetail detail){
+    private ResponseEntity checkPersonallySplitPayment(PaymentDetail detail){
         Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
         if(payment == null)
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato!");
@@ -338,7 +334,7 @@ public class PaymentDetailService {
             return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).build();
         }
 
-        if(totalPaid.compareTo(payment.getAmount()) > 0){
+        if(totalPaid.compareTo(payment.getAmount()) > 0){ // Non dovrebbe accadere mai
             payment.setStatus("PAID");
             paymentRepository.save(payment);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -346,53 +342,6 @@ public class PaymentDetailService {
 
         return ResponseEntity.status(HttpStatus.OK).build();
     }
-
-//    private ResponseEntity checkPaymentStatusPersonallySplit(PaymentDetail detail){
-//        detail.setStatus(PaymentStatus.PAID);
-//        paymentDetailRepository.save(detail);
-//
-//        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
-//        if(payment == null) //Non dovrebbe accadere mai
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato!");
-//        switch (payment.getStatus()){
-//            case NOT_PAID:
-//                if(payment.getPaymentType() == PaymentType.ALL_IN_ONE)
-//                    payment.setStatus("PAID");
-//                else
-//                    payment.setStatus("PARTIALLY_PAID");
-//                paymentRepository.save(payment);
-//                break;
-//
-//            case PARTIALLY_PAID:
-//                List<PaymentDetail> details = new ArrayList<>((Collection) paymentDetailRepository.findByPaymentId(detail.getId()));
-//                BigDecimal paidAmount = BigDecimal.ZERO;
-//                int totalUsers = details.size();
-//                int usersCount = 0;
-//                for (PaymentDetail pd : details) {
-//                    if(pd.getStatus().equals(PaymentStatus.PAID)){
-//                        paidAmount.add(pd.getAmount());
-//                        usersCount++;
-//                    }
-//                }
-//                if(paidAmount.equals(payment.getAmount()) && usersCount != totalUsers){
-//                    payment.setStatus("PAID");
-//                    paymentRepository.save(payment);
-//                    return ResponseEntity.status(HttpStatus.OK).body("Il pagamento è completo ma non tutti gli utenti hanno pagato!");
-//                }
-//                if(paidAmount.equals(payment.getAmount()) && usersCount == totalUsers){
-//                    payment.setStatus("PAID");
-//                    paymentRepository.save(payment);
-//                }
-//                break;
-//
-//            case PAID:
-//                break;
-//
-//            default:
-//                throw new IllegalStateException("Unexpected value: " + payment.getStatus());
-//        }
-//        return ResponseEntity.status(HttpStatus.OK).build();
-//    }
 
     private ResponseEntity sendProcessedPaymentEmail(PaymentDetail detail){
         Client client = ClientBuilder.newClient();
@@ -428,13 +377,29 @@ public class PaymentDetailService {
         return ResponseEntity.status(HttpStatus.CREATED).body("Email inviata con successo a " + customer.getEmail());
     }
 
-    private BigDecimal calculateUserAmount(int userId){
-        Iterable<UserOrderDetail> ods = userOrderDetailRepository.findByUserId(userId);
+    private BigDecimal calculateUserAmount(int userId, int paymentId){
+        Payment payment = paymentRepository.findById(paymentId).orElse(null);
+        if(payment == null)
+            return BigDecimal.ZERO;
+
+        Client client = ClientBuilder.newClient();
+        WebTarget target = client.target("http://localhost:8084/order/reservation/" + payment.getReservationID());
+        Order order;
+        try{
+            order = target.request().accept(MediaType.APPLICATION_JSON).get(Order.class);
+        } catch (Exception e){
+            System.err.println("Errore nella richiesta: " + e.getMessage());
+            return BigDecimal.ZERO;
+        }
+
+        Iterable<UserOrderDetail> ods = userOrderDetailRepository.findByUserIdAndOrderId(userId, order.getId());
+        if(!ods.iterator().hasNext())
+            return BigDecimal.ZERO;
 
         BigDecimal amount = BigDecimal.ZERO;
 
-        Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("http://localhost:8082/menuItem/");
+
+        target = client.target("http://localhost:8082/menuItem/");
         for(UserOrderDetail od : ods){
             try{
                 WebTarget resource = target.path(Integer.toString(od.getMenuItemId()));
@@ -451,6 +416,7 @@ public class PaymentDetailService {
                 return BigDecimal.ZERO;
             }
         }
+        client.close();
         return amount;
     }
 }
@@ -463,13 +429,15 @@ class MenuItem {
     private String description;
     private double price;
     private int menuId;
+    private boolean available;
 
     protected MenuItem(){}
 
-    public MenuItem(String name, String description, double price) {
+    public MenuItem(String name, String description, double price, boolean available) {
         this.name = name;
         this.description = description;
         this.price = price;
+        this.available = available;
     }
 
     public int getMenuId() {
@@ -506,6 +474,14 @@ class MenuItem {
 
     public int getId() {
         return id;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
     }
 }
 
@@ -571,4 +547,29 @@ class Employee{
         this.role = role;
     }
 }
+
+class Order {
+
+    private int id;
+    private int reservationId;
+    boolean served;
+
+    protected Order() {
+        this.served = false;
+    }
+
+    public Order(int reservationId) {
+        this.reservationId = reservationId;
+        this.served = false;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getReservationId() {
+        return reservationId;
+    }
+}
+
 

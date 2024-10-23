@@ -27,12 +27,16 @@ public class OrderController {
 
     @PostMapping("/add/{reservationId}")
     public ResponseEntity addOrder(@PathVariable("reservationId") Integer reservationId, @RequestBody List<OrderDetail> details) {
+        if(orderService.findByReservationId(reservationId) != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("La prenotazione in questione ha già un ordine associato. Modifica quello per aggiungere ulteriori comande!\nOrder id: " + orderService.findByReservationId(reservationId).getId());
+        }
+        
         Order newOrder = new Order(reservationId);
         String responseBody = (String) (orderService.addOrder(newOrder)).getBody();
         int id = Integer.parseInt(responseBody.substring(responseBody.lastIndexOf(": ") + 2));
         details.forEach(detail -> detail.setOrderId(id));
         orderDetailRepository.saveAll(details);
-        return ResponseEntity.ok().body("Ordine aggiunto con successo!");
+        return ResponseEntity.ok().body("Ordine aggiunto con successo!\nId: " + id);
     }
 
     @DeleteMapping("/delete/{id}")
@@ -73,7 +77,7 @@ public class OrderController {
 
     @GetMapping("/reservation/{id}")
     public ResponseEntity getOrdersByReservationId(@PathVariable("id") int id) {
-        if(!(orderService.findByReservationId(id).iterator().hasNext()))
+        if(orderService.findByReservationId(id) == null)
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok().body(orderService.findByReservationId(id));
     }

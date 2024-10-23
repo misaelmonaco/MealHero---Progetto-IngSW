@@ -5,6 +5,7 @@ import it.unisannio.orderservice.entity.OrderDetail;
 import it.unisannio.orderservice.repository.OrderDetailRepository;
 import it.unisannio.orderservice.repository.OrderRepository;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.WebTarget;
@@ -61,7 +62,7 @@ public class OrderService {
         return orderRepository.findById(id).orElse(null);
     }
 
-    public Iterable<Order> findByReservationId(Integer id) {
+    public Order findByReservationId(Integer id) {
         return orderRepository.findByReservationId(id);
     }
 

@@ -7,7 +7,6 @@ import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
 import it.unisannio.paymentmanagementservice.repository.PaymentRepository;
 import jakarta.transaction.Transactional;
-import jakarta.validation.constraints.Email;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -23,7 +22,6 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
