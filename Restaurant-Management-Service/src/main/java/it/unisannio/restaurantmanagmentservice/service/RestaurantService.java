@@ -3,7 +3,6 @@ package it.unisannio.restaurantmanagmentservice.service;
 import it.unisannio.restaurantmanagmentservice.entity.Restaurant;
 import it.unisannio.restaurantmanagmentservice.repository.RestaurantRepository;
 import it.unisannio.restaurantmanagmentservice.repository.RestaurantTableRepository;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

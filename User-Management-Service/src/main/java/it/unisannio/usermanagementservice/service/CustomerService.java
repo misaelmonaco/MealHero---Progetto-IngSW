@@ -67,6 +67,18 @@ public class CustomerService {
         return ResponseEntity.status(HttpStatus.OK).body("Customer aggiornato con successo!");
     }
 
+    public ResponseEntity subtractScore(int score, int id) {
+        Customer oldCustomer = customerRepository.findById(id).orElse(null);
+        if(oldCustomer == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Customer non trovato!");
+        }
+
+        int newScore = oldCustomer.getScore() - score;
+        oldCustomer.setScore(newScore);
+        customerRepository.save(oldCustomer);
+        return ResponseEntity.status(HttpStatus.OK).body("Customer aggiornato con successo!");
+    }
+
     public Customer findCustomerById(int id) {
        return customerRepository.findById(id).orElse(null);
     }

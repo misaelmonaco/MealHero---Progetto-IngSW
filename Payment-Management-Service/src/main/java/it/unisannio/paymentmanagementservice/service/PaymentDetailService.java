@@ -1,0 +1,575 @@
+package it.unisannio.paymentmanagementservice.service;
+
+import it.unisannio.paymentmanagementservice.model.Customer;
+import it.unisannio.paymentmanagementservice.model.PaymentStatus;
+import it.unisannio.paymentmanagementservice.model.entity.*;
+import it.unisannio.paymentmanagementservice.model.PaymentMethod;
+import it.unisannio.paymentmanagementservice.model.PaymentType;
+import it.unisannio.paymentmanagementservice.repository.*;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.stream.StreamSupport;
+
+@Service
+public class PaymentDetailService {
+
+    @Autowired
+    private PaymentDetailRepository paymentDetailRepository;
+
+    @Autowired
+    private BankAccountRepository bankAccountRepository;
+
+    @Autowired
+    private CreditCardRepository creditCardRepository;
+
+    @Autowired
+    private PayPalAccountRepository paypalAccountRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
+
+    @Autowired
+    private UserOrderDetailRepository userOrderDetailRepository;
+
+    @Autowired
+    private PayPalTransactionRepository payPalTransactionRepository;
+
+    @Autowired
+    private CardTransactionRepository cardTransactionRepository;
+
+    @Autowired
+    private CashTransactionRepository cashTransactionRepository;
+
+    // L'id del pagamento si prende dalla mail ricevuta nel momento di creazione del singolo PaymentDetail
+    public ResponseEntity updatePaymentDetail(int id, String method){
+        PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
+        if(detail == null)
+            return ResponseEntity.notFound().build();
+
+        if(detail.getStatus().equals(PaymentStatus.PAID))
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Il pagamento con id " + detail.getId() + " è già stato effettuato e non può essere più modificato!");
+
+        detail.setPaymentMethod(PaymentMethod.valueOf(method));
+        if(detail.getType().equals(PaymentType.PERSONALLY_SPLIT))
+            return updatePaymentDetailPersonallySplit(detail, detail.getUserId());
+
+        paymentDetailRepository.save(detail);
+        return ResponseEntity.ok().body("Metodo di pagamento selezionato, ora puoi procedere con la transazione!");
+    }
+
+    @Transactional
+    public ResponseEntity pay(int id, int employeeId) throws Exception {
+        PaymentDetail detail = paymentDetailRepository.findById(id).orElse(null);
+        if(detail == null)
+            return ResponseEntity.notFound().build();
+
+        if(detail.getStatus().equals(PaymentStatus.PAID))
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Il pagamento con id " + detail.getId() + " è già stato effettuato!");
+
+        ResponseEntity responseEntity;
+        switch(detail.getPaymentMethod()){
+            case CARD:
+                responseEntity = payWithCard(detail);
+                return responseEntity;
+
+            case PAYPAL:
+                responseEntity = payWithPayPal(detail);
+                return responseEntity;
+
+            case CASH:
+                if(employeeId == 0)
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Non è stato specificato l'id del dipendente responsabile del pagamento");
+                responseEntity = payWithCash(detail, employeeId);
+                return responseEntity;
+
+            default:
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile effettuare il pagamento!");
+        }
+    }
+
+    public PaymentDetail getById(int id){
+        return paymentDetailRepository.findById(id).orElse(null);
+    }
+
+    public PaymentDetail getByUserAndPaymentId(int userId, int paymentId){
+        return paymentDetailRepository.findByUserAndPaymentId(userId, paymentId);
+    }
+
+    public Iterable<PaymentDetail> getByUserId(int userId){
+        return paymentDetailRepository.findByUserId(userId);
+    }
+
+    public Iterable<PaymentDetail> getByPaymentId(int paymentId){
+        return paymentDetailRepository.findByPaymentId(paymentId);
+    }
+
+    public Iterable<PaymentDetail> getAllDetails() {
+        return paymentDetailRepository.findAll();
+    }
+
+    /**
+     *   METODI PRIVATI AD USO DEL PAYMENT DETAIL SERVICE
+     */
+
+    // Metodo update per PERSONALLY_SPLIT
+    private ResponseEntity updatePaymentDetailPersonallySplit(PaymentDetail detail, int userId){
+        BigDecimal amount = calculateUserAmount(userId, detail.getPaymentId());
+        if(amount.equals(BigDecimal.ZERO))
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Non è stato possibile calcolare la somma da pagare oppure hai tentato di selezionare il metodo di pagamento prima di selezionare ciò che vuoi pagare!");
+        detail.setAmount(amount);
+        paymentDetailRepository.save(detail);
+        return ResponseEntity.ok().body("Metodo di pagamento selezionato, ora puoi procedere con la transazione!");
+    }
+
+    @Transactional
+    protected ResponseEntity payWithCard(PaymentDetail detail) throws Exception {
+
+        CreditCard creditCard = creditCardRepository.findByUserId(detail.getUserId()).orElse(null);
+        if(creditCard == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("L'utente non ha una carta di credito associata! Associane una prima di effettuare il pagamento!");
+
+        if(!creditCard.hasSufficientBalance(detail.getAmount()))
+            return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("La carta di credito associata non ha abbastanza liquidità per effettuare il pagamento!");
+
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il pagamento associato!");
+
+        BankAccount restaurantAccount = bankAccountRepository.findById(payment.getRestaurantPayeeId()).orElse(null);
+        if(restaurantAccount == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
+
+        BigDecimal discountedAmount = BigDecimal.ZERO;
+        try{
+            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
+        } catch (Exception e){}
+        if(discountedAmount.equals(BigDecimal.ZERO)){
+            try{
+                ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+            } finally {
+                creditCard.charge(detail.getAmount());
+            }
+        }
+        else{
+            try{
+                ScoreService.userSetScore(discountedAmount, detail.getUserId());
+                creditCard.charge(discountedAmount);
+            } catch (Exception e){
+                creditCard.charge(detail.getAmount());
+            }
+        }
+        CardTransaction transaction;
+        restaurantAccount.setBalance(restaurantAccount.getBalance().add(detail.getAmount()));
+        if(discountedAmount.equals(BigDecimal.ZERO)) {
+            transaction = new CardTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), creditCard.getCardNumber());
+        } else {
+            transaction = new CardTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), creditCard.getCardNumber());
+        }
+        bankAccountRepository.save(restaurantAccount);
+        creditCardRepository.save(creditCard);
+        cardTransactionRepository.save(transaction);
+        return checkStatusAndSendEmail(detail);
+    }
+
+    @Transactional
+    protected ResponseEntity payWithPayPal(PaymentDetail detail) throws Exception {
+        PayPalAccount account = paypalAccountRepository.findByUserId(detail.getUserId()).orElse(null);
+        if(account == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("L'utente non ha un account PayPal associato! Associane uno prima di effettuare il pagamento!");
+
+        if(!account.hasSufficientBalance(detail.getAmount()))
+            return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("L'account PayPal associato non ha abbastanza liquidità per effettuare il pagamento!");
+
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il pagamento associato!");
+
+        BankAccount restaurantAccount = bankAccountRepository.findById(payment.getRestaurantPayeeId()).orElse(null);
+        if(restaurantAccount == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
+
+        BigDecimal discountedAmount = BigDecimal.ZERO;
+        try{
+            discountedAmount = ScoreService.checkAndCalculateDiscount(detail.getAmount(), detail.getUserId(), payment.getRestaurantPayeeId(), payment.getCurrency().toString());
+        } catch (Exception e){}
+        if(discountedAmount.equals(BigDecimal.ZERO)){
+            try{
+                ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+            } finally {
+                account.charge(detail.getAmount());
+            }
+        }
+        else{
+            try{
+                ScoreService.userSetScore(discountedAmount, detail.getUserId());
+                account.charge(discountedAmount);
+            } catch (Exception e){
+                account.charge(detail.getAmount());
+            }
+        }
+        PayPalTransaction transaction = null;
+        restaurantAccount.setBalance(restaurantAccount.getBalance().add(detail.getAmount()));
+        if(discountedAmount.equals(BigDecimal.ZERO)) {
+            transaction = new PayPalTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), account.getId());
+        } else {
+            transaction = new PayPalTransaction(discountedAmount, payment.getCurrency().toString(), detail.getUserId(), restaurantAccount.getRestaurantId(), payment.getPaymentType(), account.getId());
+        }
+        bankAccountRepository.save(restaurantAccount);
+        paypalAccountRepository.save(account);
+        payPalTransactionRepository.save(transaction);
+        return checkStatusAndSendEmail(detail);
+    }
+
+    // Solo gli employee del ristorante devono poter consentire il pagamento con contanti
+    @Transactional
+    protected ResponseEntity payWithCash(PaymentDetail detail, int employeeId) throws Exception {
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il pagamento associato!");
+
+        Client client = ClientBuilder.newClient();
+        WebTarget target = client.target("http://localhost:8087/employee/" + employeeId);
+        Employee employee = null;
+        try{
+            employee = target.request()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get(Employee.class);
+        }catch (Exception e){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare il dipendente!");
+        }
+
+        BankAccount restaurantAccount = bankAccountRepository.findById(payment.getRestaurantPayeeId()).orElse(null);
+        if(restaurantAccount == null)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Impossibile effettuare un pagamento a questo ristorante: conto bancario non trovato!");
+
+        restaurantAccount.setBalance(restaurantAccount.getBalance().add(detail.getAmount()));
+        try{
+            ScoreService.userSetScore(detail.getAmount(), detail.getUserId());
+        } catch (Exception e){}
+        CashTransaction transaction = new CashTransaction(detail.getAmount(), payment.getCurrency().toString(), detail.getUserId(), employee.getRestaurantId(), payment.getPaymentType(), employee.getId());
+        bankAccountRepository.save(restaurantAccount);
+        cashTransactionRepository.save(transaction);
+        client.close();
+        return checkStatusAndSendEmail(detail);
+    }
+
+    @Transactional
+    protected ResponseEntity checkStatusAndSendEmail(PaymentDetail detail){
+        checkPaymentStatus(detail);
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment.getPaymentType().equals(PaymentType.PERSONALLY_SPLIT)) {
+            ResponseEntity response = checkPersonallySplitPayment(detail);
+            if(!response.getStatusCode().is2xxSuccessful()){
+                paymentDetailRepository.deleteByPaymentIdAndStatus(detail.getPaymentId(), PaymentStatus.NOT_PAID);
+                return ResponseEntity.status(HttpStatus.OK).body("Pagamento effettuato correttamente!\nIl pagamento in questione risulta del tutto pagato!");
+            }
+            if(response.getStatusCode().is5xxServerError())
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Pagamento effettuato correttamente!\nPer il pagamento in questione si è verificato un sovrappagamento!");
+        }
+        if(sendProcessedPaymentEmail(detail).getStatusCode() != HttpStatus.CREATED)
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body("Il pagamento è stato effettuato correttamente ma non è stato possibile inviare l'email di conferma!");
+
+        return ResponseEntity.ok().body("Pagamento effettuato correttamente!");
+    }
+
+    private ResponseEntity checkPaymentStatus(PaymentDetail detail){
+        detail.setStatus(PaymentStatus.PAID);
+        paymentDetailRepository.save(detail);
+
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment == null) //Non dovrebbe accadere mai
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato per aggiornarne lo stato!");
+        switch (payment.getStatus()){
+            case NOT_PAID:
+                payment.setStatus(String.valueOf(payment.getPaymentType() == PaymentType.ALL_IN_ONE ? PaymentStatus.PAID : PaymentStatus.PARTIALLY_PAID));
+                paymentRepository.save(payment);
+                break;
+            case PARTIALLY_PAID:
+                Iterable<PaymentDetail> details = paymentDetailRepository.findByPaymentId(detail.getPaymentId());
+                boolean allPaid = StreamSupport.stream(details.spliterator(), false)
+                        .allMatch(pd -> pd.getStatus() == PaymentStatus.PAID);
+                if (allPaid) {
+                    payment.setStatus("PAID");
+                    paymentRepository.save(payment);
+                }
+                break;
+            case PAID:
+                break;
+
+            default:
+                throw new IllegalStateException("Unexpected value: " + payment.getStatus());
+        }
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
+
+    private ResponseEntity checkPersonallySplitPayment(PaymentDetail detail){
+        Payment payment = paymentRepository.findById(detail.getPaymentId()).orElse(null);
+        if(payment == null)
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile trovare il pagamento associato!");
+
+        Iterable<PaymentDetail> details = paymentDetailRepository.findByPaymentId(detail.getPaymentId());
+
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        for (PaymentDetail pd : details) {
+            if (pd.getStatus().equals(PaymentStatus.PAID))
+                totalPaid = totalPaid.add(pd.getAmount());
+        }
+
+        if(totalPaid.compareTo(payment.getAmount()) == 0){
+            payment.setStatus("PAID");
+            paymentRepository.save(payment);
+            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE).build();
+        }
+
+        if(totalPaid.compareTo(payment.getAmount()) > 0){ // Non dovrebbe accadere mai
+            payment.setStatus("PAID");
+            paymentRepository.save(payment);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
+
+    private ResponseEntity sendProcessedPaymentEmail(PaymentDetail detail){
+        Client client = ClientBuilder.newClient();
+
+        WebTarget resource = client.target("http://localhost:8087/customer/" + detail.getUserId());
+        Customer customer;
+        try {
+            Response response = resource.request()
+                    .accept(MediaType.APPLICATION_JSON)
+                    .get();
+
+            if (response.getStatus() == 200) {
+                customer = response.readEntity(Customer.class);
+            } else {
+                System.err.println("Errore nella richiesta: " + response.getStatus() + " " + response.getStatusInfo());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Non è stato possibile trovare l'user con id " + detail.getUserId());
+            }
+        } catch (Exception e) {
+            System.err.println("Errore durante la richiesta: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+
+        String email = URLEncoder.encode(customer.getEmail(), StandardCharsets.UTF_8);
+        String subject = URLEncoder.encode("Pagamento effettuato con successo", StandardCharsets.UTF_8);
+
+        resource = client.target("http://localhost:8088/email/send?to=" + email + "&subject=" + subject);
+        String body = "La transazione relativa al pagamento " + detail.getId() + " è andata a buon fine!\n\nGrazie per esserti affidato a MealHero e ai nostri ristoranti!";
+        Response response = resource.request().post(Entity.text(body));
+        if (!(response.getStatus() == 201))
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile inviare l'email a " + customer.getEmail() + " --> Response status: " + response.getStatus());
+
+        client.close();
+        return ResponseEntity.status(HttpStatus.CREATED).body("Email inviata con successo a " + customer.getEmail());
+    }
+
+    private BigDecimal calculateUserAmount(int userId, int paymentId){
+        Payment payment = paymentRepository.findById(paymentId).orElse(null);
+        if(payment == null)
+            return BigDecimal.ZERO;
+
+        Client client = ClientBuilder.newClient();
+        WebTarget target = client.target("http://localhost:8084/order/reservation/" + payment.getReservationID());
+        Order order;
+        try{
+            order = target.request().accept(MediaType.APPLICATION_JSON).get(Order.class);
+        } catch (Exception e){
+            System.err.println("Errore nella richiesta: " + e.getMessage());
+            return BigDecimal.ZERO;
+        }
+
+        Iterable<UserOrderDetail> ods = userOrderDetailRepository.findByUserIdAndOrderId(userId, order.getId());
+        if(!ods.iterator().hasNext())
+            return BigDecimal.ZERO;
+
+        BigDecimal amount = BigDecimal.ZERO;
+
+
+        target = client.target("http://localhost:8082/menuItem/");
+        for(UserOrderDetail od : ods){
+            try{
+                WebTarget resource = target.path(Integer.toString(od.getMenuItemId()));
+                MenuItem item = resource.request()
+                        .accept(MediaType.APPLICATION_JSON)
+                        .get(MenuItem.class);
+
+                if(item == null)
+                    return BigDecimal.ZERO;
+
+                amount = amount.add(BigDecimal.valueOf (item.getPrice()*od.getQuantity()));
+            } catch (Exception e){
+                System.err.println("Errore nella richiesta: " + e.getMessage());
+                return BigDecimal.ZERO;
+            }
+        }
+        client.close();
+        return amount;
+    }
+}
+
+
+class MenuItem {
+
+    private int id;
+    private String name;
+    private String description;
+    private double price;
+    private int menuId;
+    private boolean available;
+
+    protected MenuItem(){}
+
+    public MenuItem(String name, String description, double price, boolean available) {
+        this.name = name;
+        this.description = description;
+        this.price = price;
+        this.available = available;
+    }
+
+    public int getMenuId() {
+        return menuId;
+    }
+
+    public void setMenuId(int menuId) {
+        this.menuId = menuId;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
+    public void setAvailable(boolean available) {
+        this.available = available;
+    }
+}
+
+class Employee{
+    private int id;
+    private String username;
+    private String email;
+    private String password;
+    private String role;
+    private int restaurantId;
+
+    protected Employee() {this.role = "EMPLOYEE";}
+
+    public Employee(String username, String email, String password, int restaurantId) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.restaurantId = restaurantId;
+        this.role = "EMPLOYEE";
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public int getRestaurantId() {
+        return restaurantId;
+    }
+
+    public void setRestaurantId(int restaurantId) {
+        this.restaurantId = restaurantId;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+}
+
+class Order {
+
+    private int id;
+    private int reservationId;
+    boolean served;
+
+    protected Order() {
+        this.served = false;
+    }
+
+    public Order(int reservationId) {
+        this.reservationId = reservationId;
+        this.served = false;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getReservationId() {
+        return reservationId;
+    }
+}
+
+

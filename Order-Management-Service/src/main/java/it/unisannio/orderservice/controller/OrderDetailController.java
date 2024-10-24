@@ -1,7 +1,6 @@
 package it.unisannio.orderservice.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import it.unisannio.orderservice.entity.OrderDetail;
 import it.unisannio.orderservice.service.OrderDetailService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,5 +60,12 @@ public class OrderDetailController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(orderDetailService.getOrderDetailsByOrderId(id));
+    }
+
+    @GetMapping("/menuItem/{menuItemId}/orderId/{orderId}")
+    public ResponseEntity getByMenuItemIdAndOrderId(@PathVariable int menuItemId, @PathVariable int orderId) {
+        if(orderDetailService.findByMenuItemIdAndOrderId(menuItemId, orderId) == null)
+            return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(orderDetailService.findByMenuItemIdAndOrderId(menuItemId, orderId));
     }
 }

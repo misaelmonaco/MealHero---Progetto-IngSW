@@ -20,6 +20,7 @@ public class OrderController {
     @Autowired
     private OrderDetailRepository orderDetailRepository;
 
+    // Metodo utilizzabile solo in fase di sviluppo
     @PostMapping("/add")
     public ResponseEntity addOrder(@RequestBody Order order) {
         return orderService.addOrder(order);
@@ -27,12 +28,21 @@ public class OrderController {
 
     @PostMapping("/add/{reservationId}")
     public ResponseEntity addOrder(@PathVariable("reservationId") Integer reservationId, @RequestBody List<OrderDetail> details) {
+        if(orderService.findByReservationId(reservationId) != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("La prenotazione in questione ha già un ordine associato. Modifica quello per aggiungere ulteriori comande!\nOrder id: " + orderService.findByReservationId(reservationId).getId());
+        }
+        ResponseEntity response = orderService.checkIfReservationExists(reservationId);
+        if(response.getStatusCode() == HttpStatus.NOT_FOUND) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La prenotazione non esiste!");
+        } if(response.getStatusCode() == HttpStatus.INTERNAL_SERVER_ERROR)
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile verificare se la prenotazione esiste!");
+
         Order newOrder = new Order(reservationId);
         String responseBody = (String) (orderService.addOrder(newOrder)).getBody();
         int id = Integer.parseInt(responseBody.substring(responseBody.lastIndexOf(": ") + 2));
         details.forEach(detail -> detail.setOrderId(id));
         orderDetailRepository.saveAll(details);
-        return ResponseEntity.ok().body("Ordine aggiunto con successo!");
+        return ResponseEntity.ok().body("Ordine aggiunto con successo!\nId: " + id);
     }
 
     @DeleteMapping("/delete/{id}")
@@ -73,7 +83,7 @@ public class OrderController {
 
     @GetMapping("/reservation/{id}")
     public ResponseEntity getOrdersByReservationId(@PathVariable("id") int id) {
-        if(!(orderService.findByReservationId(id).iterator().hasNext()))
+        if(orderService.findByReservationId(id) == null)
             return ResponseEntity.notFound().build();
         return ResponseEntity.ok().body(orderService.findByReservationId(id));
     }

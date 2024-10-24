@@ -10,6 +10,6 @@ import org.springframework.stereotype.Repository;
 public interface OrderRepository extends CrudRepository<Order, Integer> {
 
     @Query("SELECT o FROM Order o WHERE o.reservationId = :reservationId")
-    Iterable<Order> findByReservationId(@Param("reservationId") int reservationId);
+    Order findByReservationId(@Param("reservationId") int reservationId);
 }
 

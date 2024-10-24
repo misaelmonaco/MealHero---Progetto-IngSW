@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 @Entity
 public class Employee extends Users {
 
-    int restaurantId;
+    private int restaurantId;
 
     protected Employee() {super.setRole("EMPLOYEE");}
 

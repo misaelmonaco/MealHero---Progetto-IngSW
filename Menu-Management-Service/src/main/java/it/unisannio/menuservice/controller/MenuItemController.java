@@ -31,6 +31,11 @@ public class MenuItemController {
         return menuItemService.updateMenuItem(menuItem, id);
     }
 
+    @PutMapping("/toggleAvability/{id}")
+    public ResponseEntity toggleMenuItem(@PathVariable int id) {
+        return menuItemService.toggleAvability(id);
+    }
+
     @GetMapping("/all")
     public ResponseEntity getAllMenuItems() {
         if(!(menuItemService.getMenuItems().iterator().hasNext()))

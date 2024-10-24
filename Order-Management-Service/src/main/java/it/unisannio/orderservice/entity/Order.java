@@ -16,7 +16,7 @@ public class Order {
     @Column(nullable = false)
     boolean served;
 
-    protected Order() {}
+    protected Order() {this.served = false;}
 
     public Order(int  reservationId) {
         this.reservationId = reservationId;
