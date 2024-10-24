@@ -1,36 +1,27 @@
 package it.unisannio.paymentmanagementservice.service;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import it.unisannio.paymentmanagementservice.model.PaymentStatus;
 import it.unisannio.paymentmanagementservice.model.entity.Payment;
 import it.unisannio.paymentmanagementservice.model.entity.PaymentDetail;
 import it.unisannio.paymentmanagementservice.model.entity.UserOrderDetail;
 import it.unisannio.paymentmanagementservice.repository.PaymentDetailRepository;
 import it.unisannio.paymentmanagementservice.repository.PaymentRepository;
 import it.unisannio.paymentmanagementservice.repository.UserOrderDetailRepository;
-import jakarta.persistence.Column;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * L'idea è quella che, nel momento in cui viene selezionato come metodo di pagamento
@@ -75,12 +66,27 @@ public class UserOrderDetailService {
 
                 Client client = ClientBuilder.newClient();
                 WebTarget target = client.target("http://localhost:8084/orderDetail/menuItem/" + userOrderDetail.getMenuItemId() + "/orderId/" + userOrderDetail.getOrderId());
-                OrderDetail detail = target.request()
-                        .accept(MediaType.APPLICATION_JSON)
-                        .get(OrderDetail.class);
+                OrderDetail detail = null;
+                Response resp = null;
+                try {
+                    resp = target.request()
+                            .accept(MediaType.APPLICATION_JSON)
+                            .get();
 
-                if (detail == null)
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Impossibile recuperare il dettaglio d'ordine associato!");
+                    if (resp.getStatus() != 200) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Il dettaglio d'ordine selezionato non fa parte di questo ordine!");
+                    }
+
+                    detail = resp.readEntity(OrderDetail.class);
+                } catch (ProcessingException e) {
+                    System.err.println("Errore durante il recupero di OrderDetail: " + e.getMessage());
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Errore durante il recupero del dettaglio d'ordine.");
+                } finally {
+                    if (resp != null) {
+                        resp.close();
+                    }
+                    client.close();
+                }
 
                 if (alredySelected == detail.getQuantity())
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Per il dettaglio d'ordine " + userOrderDetail.getId() + " tutte le quantità risultano già state selezionate.");

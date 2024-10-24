@@ -14,6 +14,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -162,6 +163,33 @@ public class OrderService {
         }
         client.close();
         return new ResponseEntity(orders, HttpStatus.OK);
+    }
+
+    public ResponseEntity<Reservation> checkIfReservationExists(int reservationId){
+        Client client = ClientBuilder.newClient();
+        WebTarget endpoint = client.target("http://localhost:8085");
+        WebTarget resource = endpoint.path("/reservation/" + reservationId);
+
+        Response response = null;
+        Reservation reservation = null;
+        try {
+            response = resource.request().accept(MediaType.APPLICATION_JSON).get();
+            if (response.getStatus() == 200) {
+                reservation = response.readEntity(Reservation.class);
+            }
+        } catch (ProcessingException e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        } finally {
+            if (response != null) {
+                response.close();
+            }
+            client.close();
+        }
+        if (reservation != null) {
+            return new ResponseEntity<>(reservation, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 }
 

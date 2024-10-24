@@ -53,10 +53,15 @@ public class ReservationService {
             } catch (ClassCastException e){ }
         }
         if(parkingSpotId == 0){
-            Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, false);
-            Reservation res = reservationRepository.save(newReservation);
-            return ResponseEntity.ok().body("ATTENZIONE!!: La prenotazione è stata aggiunta con successo ma non è stato possibile trovare un posto auto!\nId: " + res.getId());
-
+            if(includeParkingSpot){
+                Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, false);
+                Reservation res = reservationRepository.save(newReservation);
+                return ResponseEntity.ok().body("ATTENZIONE!!: La prenotazione è stata aggiunta con successo ma non è stato possibile trovare un posto auto!\nId: " + res.getId());
+            } else{
+                Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, includeParkingSpot);
+                Reservation res = reservationRepository.save(newReservation);
+                return ResponseEntity.ok().body("Prenotazione aggiunta con successo!\nId: " + res.getId());
+            }
         }else{
             Reservation newReservation = new Reservation(userId, numOfGuests, restaurantId, tableId, parkingSpotId, localDate, localTime, includeParkingSpot);
             Reservation res = reservationRepository.save(newReservation);
